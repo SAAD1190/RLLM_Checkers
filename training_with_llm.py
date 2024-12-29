@@ -7,9 +7,7 @@ import random
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import checkers
-
-def concatenate(array1, array2):
-    return array1 + array2
+from transformers import GPT2LMHeadModel, GPT2Tokenizer
 
 class CheckersModel(nn.Module):
     def __init__(self):
@@ -25,148 +23,162 @@ class CheckersModel(nn.Module):
         x = self.fc3(x)
         return x
 
-def GetModel(Oppenent):
+def query_llm_for_actions(current_state, previous_state, llm_model, tokenizer, game):
+    """
+    Query the LLM for the best actions based on the current and previous states.
+    Validate and return the best 7 valid actions.
+    """
+    # Prepare input prompt
+    prompt = (
+        "You are playing checkers. Based on the board state, provide the best 7 actions "
+        "in the format ((start_x, start_y), (end_x, end_y)). "
+        "Previous state:\n"
+        f"{previous_state}\n"
+        "Current state:\n"
+        f"{current_state}\n"
+        "Actions:"
+    )
+
+    inputs = tokenizer.encode(prompt, return_tensors="pt")
+    outputs = llm_model.generate(inputs, max_length=150, num_return_sequences=1)
+    generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+    # Extract and parse actions
+    suggested_actions = []
+    try:
+        actions_text = generated_text.split("Actions:")[-1]
+        for line in actions_text.strip().split("\n"):
+            action = eval(line.strip())
+            if isinstance(action, tuple) and len(action) == 2:
+                suggested_actions.append(action)
+    except Exception as e:
+        print("Error parsing LLM actions:", e)
+
+    # Validate actions against the environment
+    valid_moves = game.GetValidMoves(1)  # Assuming player 1's turn
+    filtered_actions = [action for action in suggested_actions if action in valid_moves]
+
+    # If fewer than 7 valid actions are provided, pad with random valid moves
+    while len(filtered_actions) < 7 and valid_moves:
+        random_action = random.choice(valid_moves)
+        if random_action not in filtered_actions:
+            filtered_actions.append(random_action)
+
+    return filtered_actions[:7]
+
+def train_with_llm():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
     model = CheckersModel().to(device)
-    optimizer = torch.optim.NAdam(model.parameters(), lr=0.001)
+    optimizer = optim.NAdam(model.parameters(), lr=0.001)
     criterion = nn.MSELoss()
 
-    winrates = []
+    # Load GPT-2 model and tokenizer
+    llm_model = GPT2LMHeadModel.from_pretrained("gpt2")
+    tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+
+    rewards_per_generation = []
+    losses_per_generation = []
+
     learning_rate = 0.5
     discount_factor = 0.95
-    exploration = 0.95
-    win = 0
-    lose = 0
-    draw = 0
 
-    for generations in tqdm(range(200)):
+    for generation in tqdm(range(200)):
         data = []
         labels = []
-        for g in range(10):
-            temp_data = []
+        total_reward = 0
+        total_loss = 0
+
+        for game_round in range(10):
             game = checkers.Checkers()
             player = 1
-            count = 0
-            while True:
-                count += 1
-                end2 = 0
-                if count > 1000:
-                    draw += 1
-                    break
+            temp_data = []
+            done = False
+            previous_state = None
+
+            while not done:
+                current_state = game.board.copy()
 
                 if player == 1:
-                    leafs = game.minmax(player, RL=True)
-                    Leaf = torch.zeros((len(leafs), 5), device=device)
-                    for l in range(len(leafs)):
-                        tensor = torch.tensor(leafs[l][2][:5], dtype=torch.float32, device=device)
-                        Leaf[l] = tensor
-                    scores = model(Leaf).detach().cpu().numpy()
-                    if len(scores) == 0:
-                        end2 = -player
-                        continue
-                    i = np.argmax(scores)
-                    game.PushMove(leafs[i][0])
-                    tab = leafs[i][2][:5]
-                    temp_data.append(tab)
-                elif player == -1:
-                    if Oppenent == "random":
-                        leafs = game.GetValidMoves(player)
-                        if len(leafs) == 0:
-                            end2 = -player
-                            continue
-                        move = random.choice(leafs)
-                        game.PushMove(move)
-                    elif Oppenent == "minmax":
-                        moves = game.minmax(player)
-                        if len(moves) == 0:
-                            end2 = -player
-                            continue
-                        if random.random() >= exploration:
-                            move = random.choice(game.GetValidMoves(player))
-                        else:
-                            move = random.choice(moves)
-                        game.PushMove(move)
-                    elif Oppenent == "itself":
-                        leafs = game.minmax(player, RL=True)
-                        Leaf = torch.zeros((len(leafs), 5), device=device)
-                        for l in range(len(leafs)):
-                            tensor = torch.tensor(leafs[l][2][:5], dtype=torch.float32, device=device)
-                            Leaf[l] = tensor
-                        scores = model(Leaf).detach().cpu().numpy()
-                        if len(scores) == 0:
-                            end2 = -player
-                            continue
-                        if random.random() >= exploration:
-                            move = random.choice(leafs)[0]
-                        else:
-                            i = np.argmax(scores)
-                            game.PushMove(leafs[i][0])
-                    else:
-                        raise ValueError("Invalid opponent type")
+                    actions = query_llm_for_actions(current_state, previous_state, llm_model, tokenizer, game)
 
-                end = game.EndGame()
+                    if not actions:
+                        break
 
-                if end == 1 or end2 == 1:
-                    win += 1
-                    reward = 10
-                    temp_array = np.vstack(temp_data[1:]).astype(np.float32)
-                    temp_tensor = torch.tensor(temp_array, dtype=torch.float32, device=device)
-                    old_prediction = model(temp_tensor).detach()
-                    optimal_future_value = torch.ones_like(old_prediction, device=device)
-                    temp_labels = old_prediction + learning_rate * (reward + discount_factor * optimal_future_value - old_prediction)
-                    data.extend(temp_data[1:])
-                    labels.extend(temp_labels.cpu().numpy())
-                    break
+                    action = actions[0]  # Use the first action suggested by the LLM
+                    reward = game.GetScore(verbose=False, player=player)
 
-                elif end == -1 or end2 == -1:
-                    lose += 1
-                    reward = -10
-                    temp_array = np.vstack(temp_data[1:]).astype(np.float32)
-                    temp_tensor = torch.tensor(temp_array, dtype=torch.float32, device=device)
-                    old_prediction = model(temp_tensor).detach()
-                    optimal_future_value = -torch.ones_like(old_prediction, device=device)
-                    temp_labels = old_prediction + learning_rate * (reward + discount_factor * optimal_future_value - old_prediction)
-                    data.extend(temp_data[1:])
-                    labels.extend(temp_labels.cpu().numpy())
-                    break
+                    temp_data.append(game.GetFeatures(player))
+                    game.PushMove(action)
+                    total_reward += reward
 
+                    end = game.EndGame()
+                    if end != 0:
+                        done = True
+
+                else:
+                    # Opponent plays random valid moves for simplicity
+                    valid_moves = game.GetValidMoves(player)
+                    if not valid_moves:
+                        break
+                    action = random.choice(valid_moves)
+                    game.PushMove(action)
+
+                    end = game.EndGame()
+                    if end != 0:
+                        done = True
+
+                previous_state = current_state
                 player = -player
 
-                # Convert data and labels to tensors
-        data_tensor = torch.tensor(np.vstack(data).astype(np.float32), dtype=torch.float32, device=device)
+            if temp_data:
+                temp_array = np.vstack(temp_data).astype(np.float32)
+                temp_tensor = torch.tensor(temp_array, dtype=torch.float32, device=device)
+                old_predictions = model(temp_tensor).detach()
+                optimal_future_value = torch.ones_like(old_predictions, device=device)
+                temp_labels = old_predictions + learning_rate * (
+                    total_reward + discount_factor * optimal_future_value - old_predictions
+                )
+                data.extend(temp_data)
+                labels.extend(temp_labels.cpu().numpy())
 
-        # Ensure labels is a NumPy array and convert it to a tensor
+        data_tensor = torch.tensor(np.vstack(data), dtype=torch.float32, device=device)
         labels_tensor = torch.tensor(np.array(labels, dtype=np.float32), dtype=torch.float32, device=device).view(-1, 1)
 
-        # Dataset and DataLoader for training
         dataset = TensorDataset(data_tensor, labels_tensor)
         dataloader = DataLoader(dataset, batch_size=256, shuffle=True)
 
+        for batch_data, batch_labels in dataloader:
+            optimizer.zero_grad()
+            predictions = model(batch_data)
+            loss = criterion(predictions, batch_labels)
+            loss.backward()
+            optimizer.step()
+            total_loss += loss.item()
 
-        for epoch in range(16):
-            for batch_data, batch_labels in dataloader:
-                optimizer.zero_grad()
-                predictions = model(batch_data)
-                loss = criterion(predictions, batch_labels)
-                loss.backward()
-                optimizer.step()
+        rewards_per_generation.append(total_reward / 10)
+        losses_per_generation.append(total_loss / len(dataloader))
 
-        winrate = int((win) / (win + draw + lose) * 100)
-        winrates.append(winrate)
+        torch.save(model.state_dict(), "models/llm_self_play_model.pth")
 
-        # Save the model
-        torch.save(model.state_dict(), f"models/{Oppenent}_model.pth")
+    # Plot rewards and losses
+    plt.figure(figsize=(12, 6))
 
-    # Plot win rates
-    plt.plot(range(len(winrates)), winrates, marker='o', linestyle='-')
-    plt.title('Rates of Win')
-    plt.xlabel('Generations')
-    plt.ylabel('Win Rate [%]')
+    plt.subplot(1, 2, 1)
+    plt.plot(rewards_per_generation, marker='o', linestyle='-')
+    plt.title('Average Reward Per Generation')
+    plt.xlabel('Generation')
+    plt.ylabel('Average Reward')
+
+    plt.subplot(1, 2, 2)
+    plt.plot(losses_per_generation, marker='o', linestyle='-')
+    plt.title('Average Loss Per Generation')
+    plt.xlabel('Generation')
+    plt.ylabel('Average Loss')
+
+    plt.tight_layout()
     plt.show()
 
 if __name__ == "__main__":
-    Oppenent = "itself"  # Choose opponent: "random", "minmax", "itself"
-    print(Oppenent)
-    GetModel(Oppenent=Oppenent)
+    train_with_llm()
