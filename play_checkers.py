@@ -1,7 +1,8 @@
 import torch
 import numpy as np
 from checkers import Checkers
-from model import CheckersModel  # Assuming the model class is in model.py
+import checkers
+from training import CheckersModel
 
 def play_checkers(model_path, num_games=10, verbose=False):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -29,11 +30,23 @@ def play_checkers(model_path, num_games=10, verbose=False):
                 # If no valid moves, the other player wins
                 results["win" if player == -1 else "lose"] += 1
                 if verbose:
-                    print(f"Player {player} loses.")
+                    print(f"Player {player} loses due to no valid moves.")
                 break
 
-            # Evaluate valid moves using the model
-            Leaf = torch.tensor([leaf[2][:5] for leaf in leafs], dtype=torch.float32, device=device)
+            # Filter and evaluate valid moves
+            valid_moves = [
+                leaf[2][:5]
+                for leaf in leafs
+                if len(leaf) > 2 and isinstance(leaf[2], (list, np.ndarray)) and len(leaf[2]) >= 5
+            ]
+
+            if not valid_moves:
+                results["win" if player == -1 else "lose"] += 1
+                if verbose:
+                    print(f"Player {player} loses due to invalid move data.")
+                break
+
+            Leaf = torch.tensor(valid_moves, dtype=torch.float32, device=device)
             scores = model(Leaf).detach().cpu().numpy()
             best_move_idx = np.argmax(scores)
             best_move = leafs[best_move_idx]
@@ -71,5 +84,5 @@ def play_checkers(model_path, num_games=10, verbose=False):
     print(f"Draws: {results['draw']}")
 
 if __name__ == "__main__":
-    model_path = "models/itself_model.pth"
+    model_path = "models\self_play_model.pth"
     play_checkers(model_path, num_games=5, verbose=True)
