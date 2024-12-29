@@ -26,48 +26,42 @@ class CheckersModel(nn.Module):
 import ast
 
 def query_llm_for_actions(current_state, previous_state, llm_model, tokenizer, game, debug=False):
-    """
-    Query the LLM for the best actions based on the current and previous states.
-    Validate and return up to 7 valid actions.
-    """
-    # Prepare input prompt
     prompt = (
-        "You are playing checkers. Provide up to 7 valid moves in the format ((start_x, start_y), (end_x, end_y)).\n"
+        "You are playing checkers. Based on the board state, provide up to 7 valid moves.\n"
+        "Each move must be a tuple in the format ((start_x, start_y), (end_x, end_y)).\n"
+        "Only include valid moves. No additional text or explanation.\n"
         "Previous state:\n"
         f"{previous_state}\n"
         "Current state:\n"
         f"{current_state}\n"
-        "Valid actions (list format):"
+        "Valid actions (list of tuples):"
     )
 
-    # Tokenize input without padding
+    # Tokenize input
     tokenized_input = tokenizer(prompt, return_tensors="pt", truncation=True)
     inputs = tokenized_input.input_ids
 
-    # Generate output with max_new_tokens
+    # Generate output
     outputs = llm_model.generate(inputs, max_new_tokens=100, pad_token_id=tokenizer.eos_token_id)
     generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
 
     if debug:
         print("Generated text:", generated_text)
 
-    # Extract and parse actions
-    suggested_actions = []
-    try:
-        actions_text = generated_text.split("Valid actions (list format):")[-1].strip()
-        suggested_actions = ast.literal_eval(actions_text)  # Safely parse list of actions
-        if not isinstance(suggested_actions, list):
-            suggested_actions = []
-    except Exception as e:
-        if debug:
-            print("Error parsing LLM actions:", e)
+    # Parse and validate actions
+    suggested_actions = parse_actions_from_llm_output(generated_text)
 
     # Validate actions against the environment
     valid_moves = game.GetValidMoves(1)  # Assuming player 1's turn
     filtered_actions = [action for action in suggested_actions if action in valid_moves]
 
-    # Limit to 7 valid actions
-    return filtered_actions[:7]
+    # Fallback to random if necessary
+    if not filtered_actions:
+        print("No valid moves from LLM. Falling back to random action.")
+        filtered_actions.append(random.choice(valid_moves))  # Random fallback
+
+    return filtered_actions[:7]  # Limit to 7 actions
+
 
 
 
