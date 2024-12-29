@@ -32,13 +32,12 @@ def query_llm_for_actions(current_state, previous_state, llm_model, tokenizer, g
     """
     # Prepare input prompt
     prompt = (
-        "You are playing checkers. Based on the board state, provide the best 7 actions "
-        "in the format ((start_x, start_y), (end_x, end_y)). "
+        "You are playing checkers. Provide up to 7 valid moves in the format ((start_x, start_y), (end_x, end_y)).\n"
         "Previous state:\n"
         f"{previous_state}\n"
         "Current state:\n"
         f"{current_state}\n"
-        "Actions:"
+        "Valid actions (list format):"
     )
 
     # Tokenize input without padding
@@ -46,7 +45,7 @@ def query_llm_for_actions(current_state, previous_state, llm_model, tokenizer, g
     inputs = tokenized_input.input_ids
 
     # Generate output with max_new_tokens
-    outputs = llm_model.generate(inputs, max_new_tokens=50)
+    outputs = llm_model.generate(inputs, max_new_tokens=100, pad_token_id=tokenizer.eos_token_id)
     generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
 
     if debug:
@@ -55,15 +54,10 @@ def query_llm_for_actions(current_state, previous_state, llm_model, tokenizer, g
     # Extract and parse actions
     suggested_actions = []
     try:
-        actions_text = generated_text.split("Actions:")[-1]
-        for line in actions_text.strip().split("\n"):
-            try:
-                action = eval(line.strip())  # Safely parse tuple
-                if isinstance(action, tuple) and len(action) == 2:
-                    suggested_actions.append(action)
-            except (ValueError, SyntaxError):
-                if debug:
-                    print(f"Skipping invalid action: {line.strip()}")
+        actions_text = generated_text.split("Valid actions (list format):")[-1].strip()
+        suggested_actions = ast.literal_eval(actions_text)  # Safely parse list of actions
+        if not isinstance(suggested_actions, list):
+            suggested_actions = []
     except Exception as e:
         if debug:
             print("Error parsing LLM actions:", e)
@@ -74,10 +68,6 @@ def query_llm_for_actions(current_state, previous_state, llm_model, tokenizer, g
 
     # Limit to 7 valid actions
     return filtered_actions[:7]
-
-
-
-
 
 
 
