@@ -143,7 +143,13 @@ def GetModel(Oppenent):
                 player = -player
 
         # Convert data to tensors
-        data_tensor = torch.tensor(data, dtype=torch.float32, device=device)
+        if isinstance(data, list):
+            data_array = np.vstack(data).astype(np.float32)  # Consolidate the list into a single array
+        else:
+            data_array = np.array(data, dtype=np.float32)  # Handle direct array
+
+        data_tensor = torch.tensor(data_array, device=device)
+
         labels_tensor = torch.tensor(labels, dtype=torch.float32, device=device)
 
         # Train the model
