@@ -104,6 +104,45 @@ class Checkers:
         self.board[end[0]][end[1]] = self.board[start[0]][start[1]]
         self.board[start[0]][start[1]] = 0
 
+    def minmax(self, player, RL=False, verbose=False):
+        Leafs = []
+        FinalMoves = []
+        b1 = self.CopyBoard() 
+        s1 = self.score1
+        s2 = self.score2          
+        moves = self.GetValidMoves(player, Filter=True)
+        for m1 in moves :
+            self.SetBoard(b1)
+            self.score1 = s1
+            self.score2 = s2
+            self.PushMove(m1)
+            b2 = self.CopyBoard()
+            s21 = self.score1
+            s22 = self.score2
+            Moves = self.GetValidMoves(-player, Filter=True)
+            if len(Moves) == 0 : Leafs.append((m1, 100, self.GetFeatures(player)))
+            for m2 in Moves:
+                self.SetBoard(b2)
+                self.score1 = s21
+                self.score2 = s22
+                self.PushMove(m2)
+                Leafs.append((m1, self.GetScore(verbose=False, player=player),self.GetFeatures(player)))
+        self.board = b1
+        self.score1 = s1
+        self.score2 = s2
+        maximum = -200
+        for leaf in Leafs:
+            if leaf[1] > maximum :
+                maximum = leaf[1]
+                FinalMoves.clear()
+                if not self.CheckIfInside(leaf[0][0], leaf[0][1], FinalMoves) : FinalMoves.append(leaf[0])
+            elif leaf[1] == maximum :
+                if not self.CheckIfInside(leaf[0][0], leaf[0][1], FinalMoves) : FinalMoves.append(leaf[0])
+        
+        if verbose : print(FinalMoves) ; print(Leafs)
+        if RL : return Leafs
+        return FinalMoves
+
 
 def play_self_with_model(model_path):
     """Play a game of Checkers against itself using the trained RL model."""
@@ -149,3 +188,7 @@ def play_self_with_model(model_path):
 
 if __name__ == "__main__":
     play_self_with_model("models/trained_model.pth")
+
+
+
+
