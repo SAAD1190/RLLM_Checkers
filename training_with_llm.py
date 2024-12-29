@@ -203,4 +203,13 @@ def train_with_llm():
 
 
 if __name__ == "__main__":
+    # Initialize the LLM and tokenizer
+    llm_model = GPT2LMHeadModel.from_pretrained("gpt2")
+    tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+    
+    # Ensure the tokenizer has a pad token
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+
+    # Start training
     train_with_llm()
