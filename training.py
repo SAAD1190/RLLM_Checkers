@@ -55,7 +55,12 @@ def train_self_play():
                     if not leafs:
                         break
 
-                    Leaf = torch.tensor([leaf[2][:5] for leaf in leafs], dtype=torch.float32, device=device)
+                    # Pre-convert the list of arrays to a NumPy array
+                    leaf_features = np.array([leaf[2][:5] for leaf in leafs], dtype=np.float32)
+
+                    # Convert the NumPy array to a PyTorch tensor
+                    Leaf = torch.tensor(leaf_features, dtype=torch.float32, device=device)
+
                     scores = model(Leaf).detach().cpu().numpy()
 
                     if random.random() < exploration:
