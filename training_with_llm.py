@@ -30,6 +30,10 @@ def query_llm_for_actions(current_state, previous_state, llm_model, tokenizer, g
     Query the LLM for the best actions based on the current and previous states.
     Validate and return the best 7 valid actions.
     """
+    # Ensure the tokenizer has a pad token
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+
     # Prepare input prompt
     prompt = (
         "You are playing checkers. Based on the board state, provide the best 7 actions "
@@ -42,8 +46,9 @@ def query_llm_for_actions(current_state, previous_state, llm_model, tokenizer, g
     )
 
     # Tokenize input and ensure proper formatting
-    inputs = tokenizer(prompt, return_tensors="pt", padding=True, truncation=True).input_ids
-    attention_mask = tokenizer(prompt, return_tensors="pt", padding=True, truncation=True).attention_mask
+    tokenized_input = tokenizer(prompt, return_tensors="pt", padding=True, truncation=True)
+    inputs = tokenized_input.input_ids
+    attention_mask = tokenized_input.attention_mask
 
     # Generate output with max_new_tokens
     outputs = llm_model.generate(inputs, max_new_tokens=50, attention_mask=attention_mask)
@@ -82,6 +87,7 @@ def query_llm_for_actions(current_state, previous_state, llm_model, tokenizer, g
         print("Final filtered actions:", filtered_actions)
 
     return filtered_actions[:7]
+
 
 
 
