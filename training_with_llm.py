@@ -41,14 +41,9 @@ def query_llm_for_actions(current_state, previous_state, llm_model, tokenizer, g
         "Actions:"
     )
 
-    # Tokenize input and check length
-    inputs = tokenizer.encode(prompt, return_tensors="pt")
-    max_context_length = llm_model.config.n_positions  # Typically 2048
-    if inputs.size(1) > max_context_length:
-        inputs = inputs[:, -max_context_length:]  # Truncate to fit the model context
-
-    # Create attention mask
-    attention_mask = (inputs != tokenizer.pad_token_id).long()
+    # Tokenize input and ensure proper formatting
+    inputs = tokenizer(prompt, return_tensors="pt", padding=True, truncation=True).input_ids
+    attention_mask = tokenizer(prompt, return_tensors="pt", padding=True, truncation=True).attention_mask
 
     # Generate output with max_new_tokens
     outputs = llm_model.generate(inputs, max_new_tokens=50, attention_mask=attention_mask)
@@ -87,6 +82,7 @@ def query_llm_for_actions(current_state, previous_state, llm_model, tokenizer, g
         print("Final filtered actions:", filtered_actions)
 
     return filtered_actions[:7]
+
 
 
 
