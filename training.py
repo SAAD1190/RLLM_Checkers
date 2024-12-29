@@ -137,8 +137,12 @@ def GetModel(Oppenent):
         # Convert data and labels to tensors
         data_array = np.vstack(data).astype(np.float32)
         data_tensor = torch.tensor(data_array, dtype=torch.float32, device=device)
-        labels_tensor = torch.tensor(labels, dtype=torch.float32, device=device).view(-1, 1)
-
+        # Consolidate labels into a single NumPy array and convert to tensor
+        if isinstance(labels, list):
+            labels_array = np.array(labels, dtype=np.float32)
+        else:
+            labels_array = labels
+        labels_tensor = torch.tensor(labels_array, dtype=torch.float32, device=device).view(-1, 1)
         # Dataset and DataLoader for training
         dataset = TensorDataset(data_tensor, labels_tensor)
         dataloader = DataLoader(dataset, batch_size=256, shuffle=True)
