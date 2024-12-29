@@ -63,6 +63,24 @@ def query_llm_for_actions(current_state, previous_state, llm_model, tokenizer, g
     return filtered_actions[:7]  # Limit to 7 actions
 
 
+def parse_actions_from_llm_output(generated_text):
+    try:
+        actions_text = generated_text.split("Valid actions (list of tuples):")[-1].strip()
+        suggested_actions = ast.literal_eval(actions_text)  # Safely parse list
+        if not isinstance(suggested_actions, list):
+            raise ValueError("Parsed output is not a list.")
+        # Ensure all actions are valid tuples
+        valid_format_actions = [
+            action for action in suggested_actions 
+            if isinstance(action, tuple) and len(action) == 2 
+            and all(isinstance(coord, tuple) and len(coord) == 2 for coord in action)
+        ]
+        return valid_format_actions
+    except Exception as e:
+        print(f"Error parsing LLM actions: {e}")
+        return []  # Return empty list if parsing fails
+
+
 
 
 def train_with_llm():
