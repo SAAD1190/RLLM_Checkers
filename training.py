@@ -8,9 +8,6 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 import checkers
 
-def concatenate(array1, array2):
-    return array1 + array2
-
 class CheckersModel(nn.Module):
     def __init__(self):
         super(CheckersModel, self).__init__()
@@ -25,148 +22,132 @@ class CheckersModel(nn.Module):
         x = self.fc3(x)
         return x
 
-def GetModel(Oppenent):
+def train_self_play():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
     model = CheckersModel().to(device)
-    optimizer = torch.optim.NAdam(model.parameters(), lr=0.001)
+    optimizer = optim.NAdam(model.parameters(), lr=0.001)
     criterion = nn.MSELoss()
 
-    winrates = []
+    rewards_per_generation = []
+    losses_per_generation = []
+
     learning_rate = 0.5
     discount_factor = 0.95
     exploration = 0.95
-    win = 0
-    lose = 0
-    draw = 0
 
-    for generations in tqdm(range(200)):
+    for generation in tqdm(range(200)):
         data = []
         labels = []
-        for g in range(10):
-            temp_data = []
+        total_reward = 0
+        total_loss = 0
+
+        for game_round in range(10):
             game = checkers.Checkers()
             player = 1
-            count = 0
-            while True:
-                count += 1
-                end2 = 0
-                if count > 1000:
-                    draw += 1
-                    break
+            temp_data = []
+            done = False
 
+            while not done:
                 if player == 1:
                     leafs = game.minmax(player, RL=True)
-                    Leaf = torch.zeros((len(leafs), 5), device=device)
-                    for l in range(len(leafs)):
-                        tensor = torch.tensor(leafs[l][2][:5], dtype=torch.float32, device=device)
-                        Leaf[l] = tensor
+                    if not leafs:
+                        break
+
+                    Leaf = torch.tensor([leaf[2][:5] for leaf in leafs], dtype=torch.float32, device=device)
                     scores = model(Leaf).detach().cpu().numpy()
-                    if len(scores) == 0:
-                        end2 = -player
-                        continue
-                    i = np.argmax(scores)
-                    game.PushMove(leafs[i][0])
-                    tab = leafs[i][2][:5]
-                    temp_data.append(tab)
-                elif player == -1:
-                    if Oppenent == "random":
-                        leafs = game.GetValidMoves(player)
-                        if len(leafs) == 0:
-                            end2 = -player
-                            continue
-                        move = random.choice(leafs)
-                        game.PushMove(move)
-                    elif Oppenent == "minmax":
-                        moves = game.minmax(player)
-                        if len(moves) == 0:
-                            end2 = -player
-                            continue
-                        if random.random() >= exploration:
-                            move = random.choice(game.GetValidMoves(player))
-                        else:
-                            move = random.choice(moves)
-                        game.PushMove(move)
-                    elif Oppenent == "itself":
-                        leafs = game.minmax(player, RL=True)
-                        Leaf = torch.zeros((len(leafs), 5), device=device)
-                        for l in range(len(leafs)):
-                            tensor = torch.tensor(leafs[l][2][:5], dtype=torch.float32, device=device)
-                            Leaf[l] = tensor
-                        scores = model(Leaf).detach().cpu().numpy()
-                        if len(scores) == 0:
-                            end2 = -player
-                            continue
-                        if random.random() >= exploration:
-                            move = random.choice(leafs)[0]
-                        else:
-                            i = np.argmax(scores)
-                            game.PushMove(leafs[i][0])
+
+                    if random.random() < exploration:
+                        move_idx = random.randint(0, len(leafs) - 1)
                     else:
-                        raise ValueError("Invalid opponent type")
+                        move_idx = np.argmax(scores)
 
-                end = game.EndGame()
+                    move = leafs[move_idx][0]
+                    reward = game.GetScore(verbose=False, player=player)
 
-                if end == 1 or end2 == 1:
-                    win += 1
-                    reward = 10
-                    temp_array = np.vstack(temp_data[1:]).astype(np.float32)
-                    temp_tensor = torch.tensor(temp_array, dtype=torch.float32, device=device)
-                    old_prediction = model(temp_tensor).detach()
-                    optimal_future_value = torch.ones_like(old_prediction, device=device)
-                    temp_labels = old_prediction + learning_rate * (reward + discount_factor * optimal_future_value - old_prediction)
-                    data.extend(temp_data[1:])
-                    labels.extend(temp_labels.cpu().numpy())
-                    break
+                    temp_data.append(leafs[move_idx][2][:5])
+                    game.PushMove(move)
+                    total_reward += reward
 
-                elif end == -1 or end2 == -1:
-                    lose += 1
-                    reward = -10
-                    temp_array = np.vstack(temp_data[1:]).astype(np.float32)
-                    temp_tensor = torch.tensor(temp_array, dtype=torch.float32, device=device)
-                    old_prediction = model(temp_tensor).detach()
-                    optimal_future_value = -torch.ones_like(old_prediction, device=device)
-                    temp_labels = old_prediction + learning_rate * (reward + discount_factor * optimal_future_value - old_prediction)
-                    data.extend(temp_data[1:])
-                    labels.extend(temp_labels.cpu().numpy())
-                    break
+                    end = game.EndGame()
+                    if end != 0:
+                        done = True
+
+                else:
+                    # Self-play for player -1
+                    leafs = game.minmax(player, RL=True)
+                    if not leafs:
+                        break
+
+                    Leaf = torch.tensor([leaf[2][:5] for leaf in leafs], dtype=torch.float32, device=device)
+                    scores = model(Leaf).detach().cpu().numpy()
+
+                    if random.random() < exploration:
+                        move_idx = random.randint(0, len(leafs) - 1)
+                    else:
+                        move_idx = np.argmax(scores)
+
+                    move = leafs[move_idx][0]
+                    reward = game.GetScore(verbose=False, player=player)
+
+                    temp_data.append(leafs[move_idx][2][:5])
+                    game.PushMove(move)
+                    total_reward += reward
+
+                    end = game.EndGame()
+                    if end != 0:
+                        done = True
 
                 player = -player
 
-                # Convert data and labels to tensors
-        data_tensor = torch.tensor(np.vstack(data).astype(np.float32), dtype=torch.float32, device=device)
+            if temp_data:
+                temp_array = np.vstack(temp_data).astype(np.float32)
+                temp_tensor = torch.tensor(temp_array, dtype=torch.float32, device=device)
+                old_predictions = model(temp_tensor).detach()
+                optimal_future_value = torch.ones_like(old_predictions, device=device)
+                temp_labels = old_predictions + learning_rate * (
+                    total_reward + discount_factor * optimal_future_value - old_predictions
+                )
+                data.extend(temp_data)
+                labels.extend(temp_labels.cpu().numpy())
 
-        # Ensure labels is a NumPy array and convert it to a tensor
+        data_tensor = torch.tensor(np.vstack(data), dtype=torch.float32, device=device)
         labels_tensor = torch.tensor(np.array(labels, dtype=np.float32), dtype=torch.float32, device=device).view(-1, 1)
 
-        # Dataset and DataLoader for training
         dataset = TensorDataset(data_tensor, labels_tensor)
         dataloader = DataLoader(dataset, batch_size=256, shuffle=True)
 
+        for batch_data, batch_labels in dataloader:
+            optimizer.zero_grad()
+            predictions = model(batch_data)
+            loss = criterion(predictions, batch_labels)
+            loss.backward()
+            optimizer.step()
+            total_loss += loss.item()
 
-        for epoch in range(16):
-            for batch_data, batch_labels in dataloader:
-                optimizer.zero_grad()
-                predictions = model(batch_data)
-                loss = criterion(predictions, batch_labels)
-                loss.backward()
-                optimizer.step()
+        rewards_per_generation.append(total_reward / 10)
+        losses_per_generation.append(total_loss / len(dataloader))
 
-        winrate = int((win) / (win + draw + lose) * 100)
-        winrates.append(winrate)
+        torch.save(model.state_dict(), "models/self_play_model.pth")
 
-        # Save the model
-        torch.save(model.state_dict(), f"models/{Oppenent}_model.pth")
+    # Plot rewards and losses
+    plt.figure(figsize=(12, 6))
 
-    # Plot win rates
-    plt.plot(range(len(winrates)), winrates, marker='o', linestyle='-')
-    plt.title('Rates of Win')
-    plt.xlabel('Generations')
-    plt.ylabel('Win Rate [%]')
+    plt.subplot(1, 2, 1)
+    plt.plot(rewards_per_generation, marker='o', linestyle='-')
+    plt.title('Average Reward Per Generation')
+    plt.xlabel('Generation')
+    plt.ylabel('Average Reward')
+
+    plt.subplot(1, 2, 2)
+    plt.plot(losses_per_generation, marker='o', linestyle='-')
+    plt.title('Average Loss Per Generation')
+    plt.xlabel('Generation')
+    plt.ylabel('Average Loss')
+
+    plt.tight_layout()
     plt.show()
 
 if __name__ == "__main__":
-    Oppenent = "itself"  # Choose opponent: "random", "minmax", "itself"
-    print(Oppenent)
-    GetModel(Oppenent=Oppenent)
+    train_self_play()
