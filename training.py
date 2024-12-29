@@ -111,7 +111,11 @@ def GetModel(Oppenent):
                 if end == 1 or end2 == 1:
                     win += 1
                     reward = 10
-                    temp_tensor = torch.tensor(temp_data[1:], dtype=torch.float32, device=device)
+                    # temp_tensor = torch.tensor(temp_data[1:], dtype=torch.float32, device=device)
+                    # Convert the list of NumPy arrays to a single NumPy array first
+                    temp_array = np.array(temp_data[1:], dtype=np.float32)
+                    # Then create the PyTorch tensor
+                    temp_tensor = torch.tensor(temp_array, device=device)
                     old_prediction = model(temp_tensor).detach()
                     optimal_future_value = torch.ones_like(old_prediction, device=device)
                     temp_labels = old_prediction + learning_rate * (reward + discount_factor * optimal_future_value - old_prediction)
