@@ -23,6 +23,7 @@ class CheckersModel(nn.Module):
         return x
 
 def train_self_play():
+    import os
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
@@ -130,6 +131,10 @@ def train_self_play():
         rewards_per_generation.append(total_reward / 10)
         losses_per_generation.append(total_loss / len(dataloader))
 
+        # Create the directory if it does not exist
+        os.makedirs("models", exist_ok=True)
+
+        # Save the model's state dictionary
         torch.save(model.state_dict(), "models/self_play_model.pth")
 
     # Plot rewards and losses
@@ -149,6 +154,7 @@ def train_self_play():
 
     plt.tight_layout()
     plt.show()
+
 
 if __name__ == "__main__":
     train_self_play()
