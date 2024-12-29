@@ -89,15 +89,12 @@ def train_with_llm():
     optimizer = optim.NAdam(model.parameters(), lr=0.001)
     criterion = nn.MSELoss()
 
-    # Load GPT-2 model and tokenizer
-    llm_model = GPT2LMHeadModel.from_pretrained("gpt2")
-    tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
-
     rewards_per_generation = []
     losses_per_generation = []
 
     learning_rate = 0.5
     discount_factor = 0.95
+    exploration = 0.95
 
     for generation in tqdm(range(200)):
         data = []
@@ -110,45 +107,47 @@ def train_with_llm():
             player = 1
             temp_data = []
             done = False
+
             previous_state = None
+            current_state = game.board.copy()
 
             while not done:
-                current_state = game.board.copy()
+                actions = query_llm_for_actions(current_state, previous_state, llm_model, tokenizer, game, debug=True)
 
-                if player == 1:
-                    actions = query_llm_for_actions(current_state, previous_state, llm_model, tokenizer, game)
-
-                    if not actions:
-                        break
-
-                    action = actions[0]  # Use the first action suggested by the LLM
-                    reward = game.GetScore(verbose=False, player=player)
-
-                    temp_data.append(game.GetFeatures(player))
-                    game.PushMove(action)
-                    total_reward += reward
-
-                    end = game.EndGame()
-                    if end != 0:
-                        done = True
-
-                else:
-                    # Opponent plays random valid moves for simplicity
+                if not actions:  # No valid actions provided by the LLM
+                    print("No valid actions returned by LLM. Falling back to a random action.")
                     valid_moves = game.GetValidMoves(player)
                     if not valid_moves:
+                        print("No valid moves available in the game. Ending round.")
                         break
                     action = random.choice(valid_moves)
-                    game.PushMove(action)
+                else:
+                    action = actions[0]  # Take the first action suggested by the LLM
 
-                    end = game.EndGame()
-                    if end != 0:
-                        done = True
+                if action not in game.GetValidMoves(player):
+                    print(f"Invalid action {action}. Falling back to a random action.")
+                    valid_moves = game.GetValidMoves(player)
+                    if not valid_moves:
+                        print("No valid moves available in the game. Ending round.")
+                        break
+                    action = random.choice(valid_moves)
+
+                game.PushMove(action)
+                reward = game.GetScore(verbose=False, player=player)
+
+                temp_data.append(action)  # Store the action
+                total_reward += reward
+
+                end = game.EndGame()
+                if end != 0:
+                    done = True
 
                 previous_state = current_state
+                current_state = game.board.copy()
                 player = -player
 
             if temp_data:
-                temp_array = np.vstack(temp_data).astype(np.float32)
+                temp_array = np.array(temp_data).astype(np.float32)
                 temp_tensor = torch.tensor(temp_array, dtype=torch.float32, device=device)
                 old_predictions = model(temp_tensor).detach()
                 optimal_future_value = torch.ones_like(old_predictions, device=device)
@@ -158,24 +157,31 @@ def train_with_llm():
                 data.extend(temp_data)
                 labels.extend(temp_labels.cpu().numpy())
 
-        data_tensor = torch.tensor(np.vstack(data), dtype=torch.float32, device=device)
-        labels_tensor = torch.tensor(np.array(labels, dtype=np.float32), dtype=torch.float32, device=device).view(-1, 1)
+        if data:
+            data_tensor = torch.tensor(np.vstack(data), dtype=torch.float32, device=device)
+            labels_tensor = torch.tensor(np.array(labels, dtype=np.float32), dtype=torch.float32, device=device).view(-1, 1)
 
-        dataset = TensorDataset(data_tensor, labels_tensor)
-        dataloader = DataLoader(dataset, batch_size=256, shuffle=True)
+            dataset = TensorDataset(data_tensor, labels_tensor)
+            dataloader = DataLoader(dataset, batch_size=256, shuffle=True)
 
-        for batch_data, batch_labels in dataloader:
-            optimizer.zero_grad()
-            predictions = model(batch_data)
-            loss = criterion(predictions, batch_labels)
-            loss.backward()
-            optimizer.step()
-            total_loss += loss.item()
+            for batch_data, batch_labels in dataloader:
+                optimizer.zero_grad()
+                predictions = model(batch_data)
+                loss = criterion(predictions, batch_labels)
+                loss.backward()
+                optimizer.step()
+                total_loss += loss.item()
+
+        else:
+            print("No data collected for this generation. Skipping training for this generation.")
+            rewards_per_generation.append(0)
+            losses_per_generation.append(0)
+            continue
 
         rewards_per_generation.append(total_reward / 10)
-        losses_per_generation.append(total_loss / len(dataloader))
+        losses_per_generation.append(total_loss / len(dataloader) if len(dataloader) > 0 else 0)
 
-        torch.save(model.state_dict(), "models/llm_self_play_model.pth")
+        torch.save(model.state_dict(), "models/self_play_model.pth")
 
     # Plot rewards and losses
     plt.figure(figsize=(12, 6))
@@ -194,6 +200,7 @@ def train_with_llm():
 
     plt.tight_layout()
     plt.show()
+
 
 if __name__ == "__main__":
     train_with_llm()
