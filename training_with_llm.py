@@ -23,7 +23,9 @@ class CheckersModel(nn.Module):
         x = self.fc3(x)
         return x
 
-def query_llm_for_actions(current_state, previous_state, llm_model, tokenizer, game):
+import ast
+
+def query_llm_for_actions(current_state, previous_state, llm_model, tokenizer, game, debug=False):
     """
     Query the LLM for the best actions based on the current and previous states.
     Validate and return the best 7 valid actions.
@@ -39,20 +41,34 @@ def query_llm_for_actions(current_state, previous_state, llm_model, tokenizer, g
         "Actions:"
     )
 
+    # Tokenize input and check length
     inputs = tokenizer.encode(prompt, return_tensors="pt")
-    outputs = llm_model.generate(inputs, max_length=150, num_return_sequences=1)
+    max_context_length = llm_model.config.n_positions  # Typically 2048
+    if inputs.size(1) > max_context_length:
+        inputs = inputs[:, -max_context_length:]  # Truncate to fit the model context
+
+    # Generate output with max_new_tokens
+    outputs = llm_model.generate(inputs, max_new_tokens=50, attention_mask=(inputs != tokenizer.pad_token_id))
     generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+    if debug:
+        print("Generated text:", generated_text)
 
     # Extract and parse actions
     suggested_actions = []
     try:
         actions_text = generated_text.split("Actions:")[-1]
         for line in actions_text.strip().split("\n"):
-            action = eval(line.strip())
-            if isinstance(action, tuple) and len(action) == 2:
-                suggested_actions.append(action)
+            try:
+                action = ast.literal_eval(line.strip())  # Safely parse tuple
+                if isinstance(action, tuple) and len(action) == 2:
+                    suggested_actions.append(action)
+            except (ValueError, SyntaxError):
+                if debug:
+                    print(f"Skipping invalid action: {line.strip()}")
     except Exception as e:
-        print("Error parsing LLM actions:", e)
+        if debug:
+            print("Error parsing LLM actions:", e)
 
     # Validate actions against the environment
     valid_moves = game.GetValidMoves(1)  # Assuming player 1's turn
@@ -64,7 +80,12 @@ def query_llm_for_actions(current_state, previous_state, llm_model, tokenizer, g
         if random_action not in filtered_actions:
             filtered_actions.append(random_action)
 
+    if debug:
+        print("Final filtered actions:", filtered_actions)
+
     return filtered_actions[:7]
+
+
 
 def train_with_llm():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
