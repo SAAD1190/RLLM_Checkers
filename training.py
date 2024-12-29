@@ -30,7 +30,7 @@ def GetModel(Oppenent):
     print(f"Using device: {device}")
 
     model = CheckersModel().to(device)
-    optimizer = optim.Nadam(model.parameters(), lr=0.001)
+    optimizer = torch.optim.NAdam(model.parameters(), lr=0.001)
     criterion = nn.MSELoss()
 
     winrates = []
