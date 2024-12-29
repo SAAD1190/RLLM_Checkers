@@ -37,7 +37,7 @@ def train_self_play():
     discount_factor = 0.95
     exploration = 0.95
 
-    for generation in tqdm(range(200)):
+    for generation in tqdm(range(100)):
         data = []
         labels = []
         total_reward = 0
