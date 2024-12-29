@@ -47,8 +47,11 @@ def query_llm_for_actions(current_state, previous_state, llm_model, tokenizer, g
     if inputs.size(1) > max_context_length:
         inputs = inputs[:, -max_context_length:]  # Truncate to fit the model context
 
+    # Create attention mask
+    attention_mask = (inputs != tokenizer.pad_token_id).long()
+
     # Generate output with max_new_tokens
-    outputs = llm_model.generate(inputs, max_new_tokens=50, attention_mask=(inputs != tokenizer.pad_token_id))
+    outputs = llm_model.generate(inputs, max_new_tokens=50, attention_mask=attention_mask)
     generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
 
     if debug:
@@ -60,7 +63,7 @@ def query_llm_for_actions(current_state, previous_state, llm_model, tokenizer, g
         actions_text = generated_text.split("Actions:")[-1]
         for line in actions_text.strip().split("\n"):
             try:
-                action = ast.literal_eval(line.strip())  # Safely parse tuple
+                action = eval(line.strip())  # Safely parse tuple
                 if isinstance(action, tuple) and len(action) == 2:
                     suggested_actions.append(action)
             except (ValueError, SyntaxError):
@@ -84,6 +87,7 @@ def query_llm_for_actions(current_state, previous_state, llm_model, tokenizer, g
         print("Final filtered actions:", filtered_actions)
 
     return filtered_actions[:7]
+
 
 
 
