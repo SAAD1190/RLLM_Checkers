@@ -134,18 +134,16 @@ def GetModel(Oppenent):
 
                 player = -player
 
-        # Convert data and labels to tensors
-        data_array = np.vstack(data).astype(np.float32)
-        data_tensor = torch.tensor(data_array, dtype=torch.float32, device=device)
-        # Consolidate labels into a single NumPy array and convert to tensor
-        if isinstance(labels, list):
-            labels_array = np.array(labels, dtype=np.float32)
-        else:
-            labels_array = labels
-        labels_tensor = torch.tensor(labels_array, dtype=torch.float32, device=device).view(-1, 1)
+                # Convert data and labels to tensors
+        data_tensor = torch.tensor(np.vstack(data).astype(np.float32), dtype=torch.float32, device=device)
+
+        # Ensure labels is a NumPy array and convert it to a tensor
+        labels_tensor = torch.tensor(np.array(labels, dtype=np.float32), dtype=torch.float32, device=device).view(-1, 1)
+
         # Dataset and DataLoader for training
         dataset = TensorDataset(data_tensor, labels_tensor)
         dataloader = DataLoader(dataset, batch_size=256, shuffle=True)
+
 
         for epoch in range(16):
             for batch_data, batch_labels in dataloader:
