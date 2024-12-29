@@ -30,7 +30,7 @@ def GetModel(Oppenent):
     lose = 0
     draw = 0
 
-    for generations in tqdm(range(500)):
+    for generations in tqdm(range(200)):
         data = []
         for g in range(10):
             temp_data = []
