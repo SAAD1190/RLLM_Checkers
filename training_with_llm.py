@@ -28,12 +28,8 @@ import ast
 def query_llm_for_actions(current_state, previous_state, llm_model, tokenizer, game, debug=False):
     """
     Query the LLM for the best actions based on the current and previous states.
-    Validate and return the best 7 valid actions.
+    Validate and return up to 7 valid actions.
     """
-    # Ensure the tokenizer has a pad token
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
-
     # Prepare input prompt
     prompt = (
         "You are playing checkers. Based on the board state, provide the best 7 actions "
@@ -45,13 +41,12 @@ def query_llm_for_actions(current_state, previous_state, llm_model, tokenizer, g
         "Actions:"
     )
 
-    # Tokenize input and ensure proper formatting
-    tokenized_input = tokenizer(prompt, return_tensors="pt", padding=True, truncation=True)
+    # Tokenize input without padding
+    tokenized_input = tokenizer(prompt, return_tensors="pt", truncation=True)
     inputs = tokenized_input.input_ids
-    attention_mask = tokenized_input.attention_mask
 
     # Generate output with max_new_tokens
-    outputs = llm_model.generate(inputs, max_new_tokens=50, attention_mask=attention_mask)
+    outputs = llm_model.generate(inputs, max_new_tokens=50)
     generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
 
     if debug:
@@ -77,16 +72,9 @@ def query_llm_for_actions(current_state, previous_state, llm_model, tokenizer, g
     valid_moves = game.GetValidMoves(1)  # Assuming player 1's turn
     filtered_actions = [action for action in suggested_actions if action in valid_moves]
 
-    # If fewer than 7 valid actions are provided, pad with random valid moves
-    while len(filtered_actions) < 7 and valid_moves:
-        random_action = random.choice(valid_moves)
-        if random_action not in filtered_actions:
-            filtered_actions.append(random_action)
-
-    if debug:
-        print("Final filtered actions:", filtered_actions)
-
+    # Limit to 7 valid actions
     return filtered_actions[:7]
+
 
 
 
