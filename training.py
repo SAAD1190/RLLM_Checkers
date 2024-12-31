@@ -30,7 +30,7 @@ def train_checkers_model(Opponent="itself"):
     lose = 0
     draw = 0
 
-    for generations in tqdm(range(100)):
+    for generations in tqdm(range(25)):
         data = []
         for g in range(10):
             temp_data = []
