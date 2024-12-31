@@ -16,7 +16,6 @@ def train_checkers_model(Opponent="itself"):
     model = Sequential()
     model.add(Dense(32, activation='relu', input_dim=5)) 
     model.add(Dense(16, activation='relu',  kernel_regularizer=regularizers.l2(0.1)))
-
     model.add(Dense(1, activation='relu',  kernel_regularizer=regularizers.l2(0.1)))
     model.compile(optimizer='nadam', loss='binary_crossentropy', metrics=["acc"])
 

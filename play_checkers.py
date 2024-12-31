@@ -6,9 +6,9 @@ import numpy as np
 import random
 
 
-Random = load_model("models/random.keras")
-Minmax = load_model("models/minmax.keras")
-Itself = load_model("models/itself.keras")
+# Random = load_model(r"models\random.keras")
+Minmax = load_model("models\minmax.keras")
+Itself = load_model("models\itself.keras")
 
 
 def playRandomMinMax(Bot1="random", Bot2="random", verbose=False):
