@@ -6,7 +6,7 @@ import numpy as np
 import random
 
 
-# Random = load_model(r"models\random.keras")
+Random = load_model(r"models\random.keras")
 Minmax = load_model("models\minmax.keras")
 Itself = load_model("models\itself.keras")
 
@@ -168,8 +168,8 @@ def CompareBots(player1, player2, NumberPlays):
     plt.show()
 
 if "__main__" == __name__ :
-    player1 = "Trandom"
-    player2 = "Trandom"
+    player1 = "Titself"
+    player2 = "Titself"
     print(player1, player2)
     CompareBots(player1=player1, player2=player2, NumberPlays=100)
     print(player1, player2)
