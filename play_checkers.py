@@ -86,5 +86,5 @@ def play_checkers(model_path, verbose=False):
 
 # Main execution
 if __name__ == "__main__":
-    model_path = "models/itself500.keras"
+    model_path = "models/itself.keras"
     play_checkers(model_path, verbose=True)
