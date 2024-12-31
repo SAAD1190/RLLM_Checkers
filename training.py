@@ -6,6 +6,7 @@ import tensorflow as tfw
 import numpy as np
 import random
 from tqdm import tqdm
+import os
 
 def concatenate(array1, array2):
     for i in range(len(array2)):
@@ -29,7 +30,7 @@ def train_checkers_model(Opponent="itself"):
     lose = 0
     draw = 0
 
-    for generations in tqdm(range(500)):
+    for generations in tqdm(range(100)):
         data = []
         for g in range(10):
             temp_data = []
@@ -134,7 +135,14 @@ def train_checkers_model(Opponent="itself"):
         labels = np.zeros(1)
         winrate = int((win)/(win+draw+lose)*100)
         winrates.append(winrate)
-        model.save("models/"+Opponent+"aa.keras")
+        # Save model in both formats
+        model_dir = "models"
+        os.makedirs(model_dir, exist_ok=True)
+        keras_path = os.path.join(model_dir, f"{Opponent}.keras")
+        h5_path = os.path.join(model_dir, f"{Opponent}.h5")
+
+        model.save(keras_path)
+        model.save(h5_path)
 
     
 
