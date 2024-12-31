@@ -139,10 +139,8 @@ def train_checkers_model(Opponent="itself"):
         model_dir = "models"
         os.makedirs(model_dir, exist_ok=True)
         keras_path = os.path.join(model_dir, f"{Opponent}.keras")
-        h5_path = os.path.join(model_dir, f"{Opponent}.h5")
 
         model.save(keras_path)
-        model.save(h5_path)
 
     
 
