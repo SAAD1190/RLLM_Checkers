@@ -372,6 +372,44 @@ class Checkers:
                 self.board[move[-1][0]][move[-1][1]] = -2
                 if pawn == -1 : self.score2 += 1
 
+    def playrandom(self, verbose=False, GetFeatures=False, ArrayFeatures=[]):
+        if verbose : self.Show()
+        player = -1
+        while True :
+            a = self.CopyBoard()
+            player = -player
+            moves = self.GetValidMoves(player, Filter=True)
+            if len(moves) == 0 : 
+                if verbose : print(f"player {player} lose")
+                if GetFeatures : return player, ArrayFeatures
+                return player
+            move = random.choice(moves)
+            self.PushMove(move)
+            if self.CompareBoard(a, self.board) :
+                print(f"move did not play {move}")
+                print(self.board)
+                break
+            if verbose :
+                print(move)
+                self.GetScore(verbose=True)
+                self.GetFeatures(player, verbose=True)
+                self.Show()
+            
+            if GetFeatures : ArrayFeatures.append(self.CopyBoard(), self.GetFeatures(player))
+            end = self.EndGame()
+            if (end == 2) : 
+                if verbose : print("draw")
+                if GetFeatures : return 0, ArrayFeatures
+                return 0
+            elif (end == 1) :
+                if verbose : print("white win")
+                if GetFeatures : return 1, ArrayFeatures
+                return 1
+            elif (end == -1) : 
+                if verbose : print("black win")
+                if GetFeatures : return -1, ArrayFeatures
+                return -1
+
     def SetBoard(self, tab):
         for i in range(10):
             for j in range(10):
@@ -416,6 +454,103 @@ class Checkers:
         if RL : return Leafs
         return FinalMoves
 
+    def PlayMinMax(self, player, verbose=False, GetFeatures=False, ArrayFeatures=[]):
+        a = self.CopyBoard()
+        moves = self.GetValidMoves(player, Filter=True)
+        if len(moves) == 0 : 
+            if verbose : print(f"player {player} lose")
+            if GetFeatures : return -player, ArrayFeatures
+            return -player
+        move = random.choice(self.minmax(player))
+        self.PushMove(move)
+        if self.CompareBoard(a, self.board) :
+            print(f"move did not play {move}")
+            print(self.board)
+        if verbose :
+            print(move)
+            self.GetScore(verbose=True)
+            self.GetFeatures(player, verbose=True)
+            self.Show()
+        if GetFeatures : ArrayFeatures.append((self.CopyBoard(), self.GetFeatures(player)))
+        end = self.EndGame()
+        if (end == 1) :
+            if verbose : print("white win")
+            if GetFeatures : return 1, ArrayFeatures
+            return 1
+        elif (end == -1) : 
+            if verbose : print("black win")
+            if GetFeatures : return -1, ArrayFeatures
+            return -1   
+
+    def playRandomMinMax(self, Bot1="random", Bot2="random", verbose=False, GetFeatures=False, ArrayFeatures=[]):
+        if verbose : self.Show()
+        player = -1
+        NumberOfMoves = 0
+        while True :
+            player = -player
+            if (player == 1):
+                a = self.CopyBoard()
+                moves = self.GetValidMoves(player, Filter=True)
+                if len(moves) == 0 : 
+                    if verbose : print(f"player {player} lose")
+                    if GetFeatures : return -player, ArrayFeatures
+                    return -player
+                if Bot1 == "random" : move = random.choice(moves)
+                elif Bot1 == "minmax" : move = random.choice(self.minmax(1))
+                else : raise(f"Do not know the type of bot {Bot1}")
+                self.PushMove(move)
+                if self.CompareBoard(a, self.board) :
+                    print(f"move did not play {move}")
+                    print(self.board)
+                    break
+                if GetFeatures : ArrayFeatures.append(self.GetFeatures(player))
+                if verbose :
+                    print(move)
+                    self.GetScore(verbose=True)
+                    self.GetFeatures(player, verbose=True)
+                    self.Show()
+                end = self.EndGame()
+                if (end == 1) :
+                    if verbose : print("white win")
+                    if GetFeatures : return 1, ArrayFeatures
+                    return 1
+                elif (end == -1) : 
+                    if verbose : print("black win")
+                    if GetFeatures : return -1, ArrayFeatures
+                    return -1
+            elif player == -1:
+                a = self.CopyBoard()
+                moves = self.GetValidMoves(player, Filter=True)
+                if len(moves) == 0 : 
+                    if verbose : print(f"player {player} lose")
+                    if GetFeatures : return -player, ArrayFeatures
+                    return -player
+                if Bot2 == "random" : move = random.choice(moves)
+                elif Bot2 == "minmax" : move = random.choice(self.minmax(-1))
+                else : raise(f"Do not know the type of bot {Bot2}")
+                self.PushMove(move)
+                if self.CompareBoard(a, self.board) :
+                    print(f"move did not play {move}")
+                    print(self.board)
+                    break
+                if GetFeatures : ArrayFeatures.append(self.GetFeatures(player))
+                if verbose :
+                    print(move)
+                    self.GetScore(verbose=True)
+                    self.GetFeatures(player, verbose=True)
+                    self.Show()
+                end = self.EndGame()
+                if (end == 1) :
+                    if verbose : print("white win")
+                    if GetFeatures : return 1, ArrayFeatures
+                    return 1
+                elif (end == -1) : 
+                    if verbose : print("black win")
+                    if GetFeatures : return -1, ArrayFeatures
+                    return -1    
+            NumberOfMoves += 2   
+            if (NumberOfMoves > 1000):
+                return 0, ArrayFeatures   
 
     def GetNextBoards(self, player, verbose=False):
         b = self.CopyBoard()
@@ -462,4 +597,3 @@ def main2():
 
 if "__main__" == __name__:
     main()
-    
