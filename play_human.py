@@ -15,10 +15,10 @@ ROWS, COLS = 8, 8
 SQUARE_SIZE = WIDTH // COLS
 
 # Colors
+LIGHT_BROWN = (238, 214, 175)
+DARK_BROWN = (139, 69, 19)
 WHITE = (255, 255, 255)
-BLACK = (0, 0, 0)
 RED = (255, 0, 0)
-BLUE = (0, 0, 255)
 
 # Initialize display
 WIN = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -26,26 +26,20 @@ pygame.display.set_caption("Checkers Game")
 
 # Draw the checkers board
 def draw_board(win):
-    win.fill(WHITE)
     for row in range(ROWS):
-        for col in range(row % 2, COLS, 2):
-            pygame.draw.rect(win, BLACK, (col * SQUARE_SIZE, row * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE))
+        for col in range(COLS):
+            color = LIGHT_BROWN if (row + col) % 2 == 0 else DARK_BROWN
+            pygame.draw.rect(win, color, (col * SQUARE_SIZE, row * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE))
 
 # Draw the pieces on the board
-def draw_pieces(win, game, selected_piece=None):
+def draw_pieces(win, game):
     for row in range(ROWS):
         for col in range(COLS):
             piece = game.board[row][col]
             if piece == 1:  # White piece
-                # Add a black outline for visibility
-                pygame.draw.circle(win, BLACK, (col * SQUARE_SIZE + SQUARE_SIZE // 2, row * SQUARE_SIZE + SQUARE_SIZE // 2), SQUARE_SIZE // 3 + 2)
                 pygame.draw.circle(win, WHITE, (col * SQUARE_SIZE + SQUARE_SIZE // 2, row * SQUARE_SIZE + SQUARE_SIZE // 2), SQUARE_SIZE // 3)
             elif piece == -1:  # Red piece
                 pygame.draw.circle(win, RED, (col * SQUARE_SIZE + SQUARE_SIZE // 2, row * SQUARE_SIZE + SQUARE_SIZE // 2), SQUARE_SIZE // 3)
-
-    # Highlight the selected piece
-    if selected_piece:
-        pygame.draw.circle(win, BLUE, (selected_piece[1] * SQUARE_SIZE + SQUARE_SIZE // 2, selected_piece[0] * SQUARE_SIZE + SQUARE_SIZE // 2), SQUARE_SIZE // 3 + 4, 3)
 
 # Load the AI model
 def load_checkers_model(model_path):
