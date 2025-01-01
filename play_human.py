@@ -5,6 +5,9 @@ from keras.models import load_model
 import logging
 import checkers
 
+#! Before Thursday 21H00: Enhance game vizualization and rules compliance
+#TODO Enhance game vizualization and rules compliance
+
 # Initialize Pygame and configure logging
 pygame.init()
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')

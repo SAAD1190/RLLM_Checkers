@@ -152,6 +152,9 @@ def train_checkers_model(Opponent="itself"):
     plt.xlabel('generations')
     plt.ylabel('wins [%]')
 
+    #! Before Thursday 21H00: Add plot for rewards and losses
+    #TODO: Add plot for rewards and losses
+
     plt.show()
 
 if "__main__" == __name__ :
