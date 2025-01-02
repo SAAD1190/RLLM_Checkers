@@ -1,10 +1,10 @@
 Introduction
 ========================
 
-.. figure:: /Documentation/images/intro.png
+.. figure:: /Documentation/images/pilot.png
    :width: 500
    :align: center
-   :alt: Image explaining Prompt Analyzer introduction
+   :alt: introduction
 
 --------------------------------------------------------------
 

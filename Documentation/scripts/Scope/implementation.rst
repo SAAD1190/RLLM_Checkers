@@ -2,9 +2,9 @@ Implementation Details
 ========================
 
 .. figure:: /Documentation/images/architecture.png
-   :width: 500
+   :width: 700
    :align: center
-   :alt: Image explaining Prompt Analyzer introduction
+   :alt: architecture
 
 --------------------------------------------------------------
 

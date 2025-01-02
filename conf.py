@@ -6,8 +6,8 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = 'Prompt Analyzer'
-copyright = '2024, GIIADS, By IMAD MAALOUF AND SAAD MENIAR'
+project = 'RLLM Checkers'
+copyright = '2025, GIIADS, By ABIR AHRIZ, SAAD MENIAR, IMAD MAALOUF, NOURREDINE SAIDI, SALAH CHEGRI'
 author = 'SAAD UTAH'
 
 # -- General configuration ---------------------------------------------------

@@ -1,7 +1,7 @@
 LLM backed Chess Reinforcement Learning Documentation
 =============================================
 
-.. figure:: /Documentation/images/pilot.png
+.. figure:: /Documentation/images/intro.png
    :width: 500
    :align: center
    :alt: Documentation Cover
