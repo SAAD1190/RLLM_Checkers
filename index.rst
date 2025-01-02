@@ -1,45 +1,30 @@
-Welcome to the Prompt Analyzer Documentation
+LLM backed Chess Reinforcement Learning Documentation
 =============================================
 
-.. figure:: /Documentation/images/pilot.jpg
+.. figure:: /Documentation/images/pilot.png
    :width: 200
    :align: center
-   :alt: Multi_RAG Documentation Cover
+   :alt: Documentation Cover
 
 --------------------------------------------------------
 
-.. figure:: /Documentation/images/app_screenshots.png
-   :width: 600
-   :align: center
-   :alt: Application Screenshots
---------------------------------------------------------------
 
+Checkers Reinforcement Learning Model
+=====================================
 
-
-
-**Prompt Analyzer** is a cutting-edge tool designed to analyze, sort, and optimize prompts for natural language processing (NLP) tasks. Built on a robust architecture, it combines advanced metrics like **Semantic Vocabulary Richness**, **Relevance**, and **Lexical Density** with an intuitive user interface powered by **Streamlit**.
+This documentation provides an overview of the training process and architecture of a reinforcement learning model designed to play the game of checkers. It incorporates a hybrid Deep Q-Learning approach, combined with custom self-play and evaluation mechanisms, with a core integration of a Language Model (LLM) to limit the action space effectively.
 
 Key Features
 ------------
 
-- **Multimodal Support**: Analyze and compare prompts in multiple ways.
-- **Advanced Metrics**: Evaluate semantic and syntactic quality, relevance, and richness.
-- **Customizable Analysis**: Flexible sorting and filtering options for tailored results.
-- **Powerful Backend**: Leverages embeddings from `SentenceTransformer` models like `all-mpnet-base-v2`.
+- **Reinforcement Learning (RL)**: Utilizes temporal difference learning with a neural network to approximate Q-values for state-action pairs.
+- **Self-Play**: The model trains against itself to iteratively improve its gameplay.
+- **Custom Opponents**: Supports training against various opponents, including random moves, minimax strategies, and itself.
+- **LLM-Driven Action Space Limitation**: A Language Model (LLM) acts as an integral part of the architecture, dynamically reducing the action space to the most promising options.
+- **Exploration-Exploitation Balance**: Implements a dynamic exploration parameter to balance random exploration and policy exploitation.
+- **Performance Metrics**: Tracks win rates over generations for performance evaluation.
 
-Audience
---------
 
-This documentation is designed for researchers, developers, and NLP enthusiasts looking to enhance their workflows using Prompt Analyzer.
-
-Next Steps
-----------
-
-Explore the following sections to get started:
-
-- **Installation**: Learn how to set up Prompt Analyzer.
-- **User Guide**: Step-by-step instructions for using the tool.
-- **Advanced Features**: Dive into redundancy removal and hybrid relevance scoring.
 
 .. toctree::
    :maxdepth: 2
@@ -51,7 +36,7 @@ Explore the following sections to get started:
    :maxdepth: 2
    :caption: Implementation
 
-   Documentation/scripts/Scope/guide.rst
+   Documentation/scripts/Scope/implementation.rst
 
 .. toctree::
    :maxdepth: 2

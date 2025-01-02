@@ -1,52 +1,59 @@
 Overview
 ========================
 
-.. figure:: /Documentation/images/intro.jpg
+.. figure:: /Documentation/images/intro.png
    :width: 500
    :align: center
    :alt: Image explaining Prompt Analyzer introduction
 
 --------------------------------------------------------------
 
-.. figure:: /Documentation/images/app_screenshots.png
-   :width: 800
-   :align: center
-   :alt: Application Screenshots
+Introduction
+============
 
---------------------------------------------------------------
+Overview
+--------
 
-**Prompt Analyzer** is an advanced tool designed to analyze, evaluate, and optimize prompts for natural language processing (NLP) tasks. It provides insights into prompts using a combination of semantic and syntactic metrics, empowering users to refine their NLP workflows.
+This project implements a reinforcement learning agent to play the game of checkers. The goal is to design a self-improving agent capable of learning optimal strategies through self-play and dynamic decision-making. The core innovation of this project lies in the integration of a Language Model (LLM) to act as an action space limiter, enabling efficient and focused decision-making.
 
-Highlights
-=============
+Motivation
+----------
 
-- **Interactive Interface**: Powered by Streamlit for an intuitive user experience.
+Traditional reinforcement learning approaches often struggle with large action spaces, especially in complex games like checkers. By incorporating an LLM to filter and prioritize actions, this project:
 
-- **Comprehensive Metrics**: Evaluate prompts based on Semantic Richness, Vocabulary Richness, Relevance, Lexical Density, and more.
+- Reduces computational overhead.
+- Enhances the agent’s decision-making efficiency.
+- Introduces a novel hybrid approach combining reinforcement learning and natural language processing techniques.
 
-General Pipeline
-===================
+Goals
+-----
 
-**Input Prompts**
------------------
+The primary objectives of this project include:
 
-Users provide one or more natural language prompts (e.g., "Explain the applications of machine learning.").
+1. Developing a reinforcement learning agent capable of self-play and iterative improvement.
+2. Demonstrating the effectiveness of LLMs in reducing the action space in real-time.
+3. Evaluating the agent's performance through metrics like win rates and reward distributions.
 
-**Semantic and Syntactic Analysis**
------------------------------------
+Key Features
+------------
 
-- **Text Preprocessing**: Prompts are tokenized, and stop words and punctuation are removed for clean processing.
-- **Embedding Generation**: Each prompt is converted into dense vectors using pre-trained models (e.g., SentenceTransformer's `all-mpnet-base-v2`).
-- **Metric Computation**: Various metrics, such as Semantic Diversity Score (SDS), Semantic Repetition Penalty (SRP), Vocabulary Richness (VR), and Relevance, are computed.
+- **Self-Play Reinforcement Learning:**
+  The agent learns by playing against itself, improving iteratively with each generation.
 
-**Sorting and Scoring**
------------------------
+- **LLM Integration:**
+  The LLM acts as a core component to limit the action space dynamically, ensuring the agent considers only the most promising moves.
 
-- Prompts are evaluated and scored based on the selected metric (e.g., Relevance, Semantic Vocabulary Richness).
-- If relevance is chosen, a reference prompt set is used to compute hybrid relevance scores.
+- **Customizable Opponents:**
+  The agent can train against various types of opponents, including random moves, minimax strategies, and itself.
 
-**Output**
--------------------
+- **Performance Metrics:**
+  The system tracks win rates, losses, and rewards over generations, providing insights into the agent's learning progress.
 
-- The final results include sorted prompts and corresponding scores, displayed in an interactive table.
-- Optional download of results in JSON format for further analysis.
+
+Next Steps
+----------
+
+To go deeper, proceed to the following sections:
+
+- **Implementation:** Learn about the agent’s architecture, training process, and the integration of the LLM.
+- **Interface:** Discover how to interact with the trained model and visualize its performance.
