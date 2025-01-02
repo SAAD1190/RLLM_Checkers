@@ -78,3 +78,9 @@ Run the following command to install dependencies:
 .. code-block:: bash
 
    pip install pygame tensorflow==2.11.0
+
+Next Steps
+----------
+
+- **Chess RLLM:**
+  Apply everything you learned so far to enhance a bigger project: Chess RLLM. Visit the GitHub repository for more details: [Chess RLLM GitHub](https://github.com/SAAD1190/RLLM_Chess).
