@@ -1,4 +1,4 @@
-Overview
+Introduction
 ========================
 
 .. figure:: /Documentation/images/intro.png
@@ -7,9 +7,6 @@ Overview
    :alt: Image explaining Prompt Analyzer introduction
 
 --------------------------------------------------------------
-
-Introduction
-============
 
 Overview
 --------
