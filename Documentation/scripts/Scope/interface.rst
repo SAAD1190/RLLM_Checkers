@@ -79,7 +79,7 @@ Run the following command to install dependencies:
 
    pip install pygame tensorflow==2.11.0
 
-Next Steps
+Next Steps - Applying project knowledge in Chess RLLM
 ==========
 
 - **Chess RLLM:**
