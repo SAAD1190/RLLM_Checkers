@@ -1,7 +1,7 @@
 # Checkers LLM-Reinforcement Learning Project
 
 <p align="center">
-  <img src="Documentation\images\intro.png" width="300px" alt="Prompt Analyzer">
+  <img src="Documentation\images\intro.png" width="500px" alt="Prompt Analyzer">
 </p>
 
 This project leverages reinforcement learning and a Language Model (LLM) to train an advanced AI agent capable of playing the game of checkers. It integrates innovative techniques to improve training with action-space limitation, decision-making efficiency and gameplay performance.
