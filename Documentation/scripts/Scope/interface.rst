@@ -6,10 +6,10 @@ This section provides an overview of the interactive interface for playing the c
 Game Interface
 --------
 
-.. image:: Documentation\images\demo_pic.png
+.. figure:: /Documentation/images/demo_pic.png
    :width: 900
-   :alt: Checkers Gameplay Demo
    :align: center
+   :alt: demo_pic
 
 
 Overview
