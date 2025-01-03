@@ -25,15 +25,20 @@ def create_keras_model():
 
 def get_top_moves_from_llm(board_state, num_moves=3):
     """
-    Get the top N moves from the LLM based on the current board state.
+    Get the top N moves from LLM based on the current board state.
     """
     prompt = f"Game board: {board_state}\nSuggest the top {num_moves} best moves:"
     inputs = tokenizer(prompt, return_tensors="pt")
-    outputs = llm_model.generate(**inputs, max_length=150, num_return_sequences=1)
+    
+    # Generate LLM output using max_new_tokens
+    outputs = llm_model.generate(**inputs, max_new_tokens=50, num_return_sequences=1)
     prediction = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    
+    # Extract moves from the LLM output
     lines = prediction.split("\n")
     moves = [line.split(":")[-1].strip() for line in lines if ":" in line][-num_moves:]
     return moves
+
 
 def train_checkers_model(Opponent="itself"):
     model = create_keras_model()
