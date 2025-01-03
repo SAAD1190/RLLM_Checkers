@@ -1,75 +1,47 @@
 import checkers
 import matplotlib.pyplot as plt
-import torch
+from keras import Sequential, regularizers
+from keras.layers import Dense
+import tensorflow as tf
 import numpy as np
 import random
 from tqdm import tqdm
 import os
-from transformers import AutoConfig
 from transformers import GPTNeoForCausalLM, GPT2Tokenizer
 
-# Use GPTNeo instead of GPTNeoX for the 2.7B model
+# Initialize LLM (GPT-Neo 2.7B)
 model_name = "EleutherAI/gpt-neo-2.7B"
-model = GPTNeoForCausalLM.from_pretrained(model_name)  # Fix: Use GPTNeo
+llm_model = GPTNeoForCausalLM.from_pretrained(model_name)
 tokenizer = GPT2Tokenizer.from_pretrained(model_name)
 
-# Function to check configuration
-config = AutoConfig.from_pretrained(model_name)
-print(config)  # Inspect hidden_size and other config attributes
-
-
-def concatenate(array1, array2):
-    for i in range(len(array2)):
-        array1.append(array2[i])
-    return array1  
+# Keras model for board evaluation
+def create_keras_model():
+    model = Sequential()
+    model.add(Dense(32, activation='relu', input_dim=5))
+    model.add(Dense(16, activation='relu', kernel_regularizer=regularizers.l2(0.1)))
+    model.add(Dense(1, activation='linear', kernel_regularizer=regularizers.l2(0.1)))
+    model.compile(optimizer='nadam', loss='binary_crossentropy', metrics=["acc"])
+    return model
 
 def get_top_moves_from_llm(board_state, num_moves=3):
     """
-    Get the top N moves from GPT-NeoX model based on the current board state.
+    Get the top N moves from the LLM based on the current board state.
     """
     prompt = f"Game board: {board_state}\nSuggest the top {num_moves} best moves:"
-    
-    # Tokenize the prompt
     inputs = tokenizer(prompt, return_tensors="pt")
-    
-    # Generate LLM output
-    outputs = model.generate(**inputs, max_length=150, num_return_sequences=1)
+    outputs = llm_model.generate(**inputs, max_length=150, num_return_sequences=1)
     prediction = tokenizer.decode(outputs[0], skip_special_tokens=True)
-    
-    # Extract moves from output
     lines = prediction.split("\n")
-    moves = [line.split(":")[-1].strip() for line in lines if ":" in line][-num_moves:]  # Extract last `num_moves`
+    moves = [line.split(":")[-1].strip() for line in lines if ":" in line][-num_moves:]
     return moves
 
-def evaluate_moves_and_choose_best(game, candidate_moves):
-    """
-    Evaluate the 3 moves and choose the best based on game simulation.
-    """
-    best_move = None
-    best_score = float('-inf')
-
-    for move in candidate_moves:
-        temp_game = game.clone()  # Clone the game to simulate without affecting the actual game
-        try:
-            temp_game.PushMove(move)  # Apply the move
-            score = temp_game.evaluate_board()  # Assume a method exists to evaluate the board state
-        except:
-            score = -float('inf')  # If move is invalid, assign very low score
-        
-        if score > best_score:
-            best_score = score
-            best_move = move
-
-    return best_move
-
 def train_checkers_model(Opponent="itself"):
+    model = create_keras_model()
     winrates, avg_losses, avg_rewards = [], [], []
-    learning_rate = 0.5
-    discount_factor = 0.95
     win, lose, draw = 0, 0, 0
 
     for generations in tqdm(range(5)):
-        data = []
+        data, labels = [], []
         generation_losses, generation_rewards = [], []
 
         for g in range(10):
@@ -80,29 +52,42 @@ def train_checkers_model(Opponent="itself"):
 
             while True:
                 count += 1
-                if count > 1000:  # Draw condition
+                if count > 1000:
                     draw += 1
                     break
 
                 if player == 1:
-                    # Get the board state
+                    # Get the board state and ask LLM for top 3 moves
                     board_state = game.get_board_state()
-
-                    # Get the top 3 moves from the LLM
                     candidate_moves = get_top_moves_from_llm(board_state, num_moves=3)
-                    
-                    # Choose the best move from the 3
-                    move = evaluate_moves_and_choose_best(game, candidate_moves)
 
-                    if move:
-                        game.PushMove(move)
-                        temp_data.append((board_state, move))
+                    # Evaluate the 3 moves and choose the best
+                    leafs = []
+                    for move in candidate_moves:
+                        # Get board tensor representation
+                        board_tensor = tf.constant(np.array(move[:5]), dtype=tf.float32)
+                        leafs.append((move, board_tensor))
+
+                    if len(leafs) == 0:
+                        lose += 1
+                        break
+
+                    # Get model scores for the 3 moves
+                    Leaf = tf.stack([leaf[1] for leaf in leafs])
+                    scores = model.predict_on_batch(Leaf)
+                    best_index = np.argmax(scores)
+                    best_move = leafs[best_index][0]
+                    game.PushMove(best_move)
+                    temp_data.append(leafs[best_index][1])
+
                 else:
-                    # Opponent's move (random or heuristic-based)
-                    legal_moves = game.get_legal_moves()
+                    legal_moves = game.GetValidMoves(player)
                     move = random.choice(legal_moves) if legal_moves else None
                     if move:
                         game.PushMove(move)
+                    else:
+                        win += 1
+                        break
 
                 end = game.EndGame()
                 if end in [1, -1]:
@@ -111,61 +96,57 @@ def train_checkers_model(Opponent="itself"):
                     lose += (end == -1)
                     generation_rewards.append(reward)
 
-                    temp_tensor = torch.tensor([t[0] for t in temp_data])
-                    old_prediction = model(temp_tensor).detach().numpy()
-                    optimal_futur_value = np.ones_like(old_prediction) * (1 if end == 1 else -1)
-                    loss = learning_rate * (reward + discount_factor * optimal_futur_value - old_prediction)
-                    generation_losses.append(loss.mean().item())
-
-                    temp_labels = old_prediction + loss
-                    data.extend([t[0] for t in temp_data])
-                    labels = np.vstack((np.zeros(1), temp_labels))
+                    temp_tensor = tf.constant(temp_data[1:], dtype=tf.float32)
+                    old_prediction = model.predict_on_batch(temp_tensor)
+                    optimal_future_value = np.ones_like(old_prediction) * (1 if end == 1 else -1)
+                    temp_labels = old_prediction + 0.5 * (reward + 0.95 * optimal_future_value - old_prediction)
+                    data.extend(temp_data[1:])
+                    labels.extend(temp_labels)
                     break
 
                 player = -player
 
-        data_tensor = torch.tensor(data)
-        labels_tensor = torch.tensor(labels[1:])
-        model.train()  # Enable training mode
-        # Example optimizer usage (e.g., Adam)
-        optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-        optimizer.zero_grad()
-        loss = torch.nn.functional.mse_loss(model(data_tensor), labels_tensor)
-        loss.backward()
-        optimizer.step()
+        if data:
+            data_tensor = tf.constant(np.array(data), dtype=tf.float32)
+            labels_tensor = tf.constant(np.array(labels), dtype=tf.float32)
+
+            # Train Keras model
+            history = model.fit(data_tensor, labels_tensor, epochs=16, batch_size=256, verbose=0)
+            avg_losses.append(np.mean(history.history['loss']))
+            avg_rewards.append(np.mean(generation_rewards))
 
         winrate = int(win / (win + draw + lose + 1e-5) * 100)
         winrates.append(winrate)
-        avg_losses.append(np.mean(generation_losses))
-        avg_rewards.append(np.mean(generation_rewards))
 
+        # Save model
         model_dir = "models"
         os.makedirs(model_dir, exist_ok=True)
-        model.save_pretrained(os.path.join(model_dir, f"{Opponent}.gpt"))
+        keras_path = os.path.join(model_dir, f"{Opponent}.keras")
+        model.save(keras_path)
 
-    plt.figure(figsize=(15, 5))
-    plt.subplot(1, 3, 1)
-    plt.plot(range(len(winrates)), winrates, marker='o', linestyle='-', label='Win Rate')
-    plt.title('Win Rates')
+    # Plot results
+    plt.figure(figsize=(10, 5))
+    plt.plot(range(len(winrates)), winrates, marker='o', label='Win Rate')
+    plt.title('Win Rate per Generation')
     plt.xlabel('Generations')
-    plt.ylabel('Wins [%]')
+    plt.ylabel('Win Rate [%]')
     plt.legend()
+    plt.show()
 
-    plt.subplot(1, 3, 2)
-    plt.plot(range(len(avg_losses)), avg_losses, marker='o', linestyle='-', color='orange', label='Avg Loss')
+    plt.figure(figsize=(10, 5))
+    plt.plot(range(len(avg_losses)), avg_losses, marker='o', color='red', label='Average Loss')
     plt.title('Average Loss per Generation')
     plt.xlabel('Generations')
     plt.ylabel('Loss')
     plt.legend()
+    plt.show()
 
-    plt.subplot(1, 3, 3)
-    plt.plot(range(len(avg_rewards)), avg_rewards, marker='o', linestyle='-', color='green', label='Avg Reward')
+    plt.figure(figsize=(10, 5))
+    plt.plot(range(len(avg_rewards)), avg_rewards, marker='o', color='green', label='Average Reward')
     plt.title('Average Reward per Generation')
     plt.xlabel('Generations')
     plt.ylabel('Reward')
     plt.legend()
-
-    plt.tight_layout()
     plt.show()
 
 if "__main__" == __name__:
