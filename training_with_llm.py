@@ -23,32 +23,37 @@ def create_keras_model():
     model.compile(optimizer='nadam', loss='mean_squared_error', metrics=["mae"])
     return model
 
-def parse_llm_move(move_str):
-    """
-    Parse the LLM output string into a list of tuples (move format for checkers).
-    Example input: '(2, 3) -> (4, 5)'
-    Example output: [(2, 3), (4, 5)]
-    """
-    try:
-        moves = move_str.replace("->", ",").replace("(", "").replace(")", "").split(",")
-        coords = [(int(moves[i]), int(moves[i + 1])) for i in range(0, len(moves), 2)]
-        return coords
-    except Exception as e:
-        print(f"Failed to parse LLM move: {move_str}, error: {e}")
-        return None
-
 def get_top_moves_from_llm(features, player, num_moves=3):
     """
     Get the top N moves from LLM based on the current board features.
     """
     player_name = "white" if player == 1 else "black"
     formatted_features = ", ".join([f"Feature {i}: {v:.2f}" for i, v in enumerate(features)])
-    prompt = f"Game features: {formatted_features}\nSuggest the top {num_moves} best moves for {player_name} in the format (x1, y1) -> (x2, y2):"
-    print(f"LLM Prompt: {prompt[:200]}...")  # For debugging
+    
+    # Add example moves to the prompt to guide the LLM.
+    example_moves = """
+    Examples of valid moves:
+    - (2, 3) -> (4, 5)
+    - (6, 7) -> (5, 6)
+    - (1, 2) -> (3, 4)
+    """
+    prompt = f"""
+    Game features: {formatted_features}
+    Suggest the top {num_moves} best moves for {player_name} in the format (x1, y1) -> (x2, y2).
+    {example_moves}
+    """
+
+    print(f"LLM Prompt: {prompt[:300]}...")  # For debugging
 
     try:
         inputs = tokenizer(prompt, return_tensors="pt")
-        outputs = llm_model.generate(**inputs, max_new_tokens=50)
+        outputs = llm_model.generate(
+            **inputs,
+            max_new_tokens=50,
+            temperature=0.7,  # Lower temperature to reduce randomness
+            top_k=50,  # Use top-k sampling
+            pad_token_id=tokenizer.eos_token_id,
+        )
         prediction = tokenizer.decode(outputs[0], skip_special_tokens=True)
         print(f"LLM Output: {prediction}")
     except Exception as e:
@@ -67,6 +72,21 @@ def get_top_moves_from_llm(features, player, num_moves=3):
             break
 
     return parsed_moves
+
+def parse_llm_move(move_str):
+    """
+    Parse the LLM output string into a list of tuples (move format for checkers).
+    Example input: '(2, 3) -> (4, 5)'
+    Example output: [(2, 3), (4, 5)]
+    """
+    try:
+        moves = move_str.replace("->", ",").replace("(", "").replace(")", "").split(",")
+        coords = [(int(moves[i].strip()), int(moves[i + 1].strip())) for i in range(0, len(moves), 2)]
+        return coords
+    except Exception as e:
+        print(f"Failed to parse LLM move: {move_str}, error: {e}")
+        return None
+
 
 def train_checkers_model(Opponent="itself"):
     model = create_keras_model()
