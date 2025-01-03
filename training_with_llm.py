@@ -9,8 +9,8 @@ from tqdm import tqdm
 import os
 from transformers import GPTNeoForCausalLM, GPT2Tokenizer
 
-# Initialize LLM (GPT-Neo 2.7B)
-model_name = "EleutherAI/gpt-neo-2.7B"
+# Initialize LLM (GPT-Neo)
+model_name = "EleutherAI/gpt-neo-125M"
 llm_model = GPTNeoForCausalLM.from_pretrained(model_name)
 tokenizer = GPT2Tokenizer.from_pretrained(model_name)
 
@@ -20,25 +20,53 @@ def create_keras_model():
     model.add(Dense(32, activation='relu', input_dim=5))
     model.add(Dense(16, activation='relu', kernel_regularizer=regularizers.l2(0.1)))
     model.add(Dense(1, activation='linear', kernel_regularizer=regularizers.l2(0.1)))
-    model.compile(optimizer='nadam', loss='binary_crossentropy', metrics=["acc"])
+    model.compile(optimizer='nadam', loss='mean_squared_error', metrics=["mae"])
     return model
 
-def get_top_moves_from_llm(board_state, num_moves=3):
+def parse_llm_move(move_str):
     """
-    Get the top N moves from LLM based on the current board state.
+    Parse the LLM output string into a list of tuples (move format for checkers).
+    Example input: '(2, 3) -> (4, 5)'
+    Example output: [(2, 3), (4, 5)]
     """
-    prompt = f"Game board: {board_state}\nSuggest the top {num_moves} best moves:"
-    inputs = tokenizer(prompt, return_tensors="pt")
-    
-    # Generate LLM output using max_new_tokens
-    outputs = llm_model.generate(**inputs, max_new_tokens=50, num_return_sequences=1)
-    prediction = tokenizer.decode(outputs[0], skip_special_tokens=True)
-    
+    try:
+        moves = move_str.replace("->", ",").replace("(", "").replace(")", "").split(",")
+        coords = [(int(moves[i]), int(moves[i + 1])) for i in range(0, len(moves), 2)]
+        return coords
+    except Exception as e:
+        print(f"Failed to parse LLM move: {move_str}, error: {e}")
+        return None
+
+def get_top_moves_from_llm(features, player, num_moves=3):
+    """
+    Get the top N moves from LLM based on the current board features.
+    """
+    player_name = "white" if player == 1 else "black"
+    formatted_features = ", ".join([f"Feature {i}: {v:.2f}" for i, v in enumerate(features)])
+    prompt = f"Game features: {formatted_features}\nSuggest the top {num_moves} best moves for {player_name} in the format (x1, y1) -> (x2, y2):"
+    print(f"LLM Prompt: {prompt[:200]}...")  # For debugging
+
+    try:
+        inputs = tokenizer(prompt, return_tensors="pt")
+        outputs = llm_model.generate(**inputs, max_new_tokens=50)
+        prediction = tokenizer.decode(outputs[0], skip_special_tokens=True)
+        print(f"LLM Output: {prediction}")
+    except Exception as e:
+        print(f"Error in LLM generation: {e}")
+        return []  # Return empty moves if generation fails
+
     # Extract moves from the LLM output
     lines = prediction.split("\n")
-    moves = [line.split(":")[-1].strip() for line in lines if ":" in line][-num_moves:]
-    return moves
+    parsed_moves = []
+    for line in lines:
+        if "->" in line:
+            move = parse_llm_move(line)
+            if move:
+                parsed_moves.append(move)
+        if len(parsed_moves) >= num_moves:
+            break
 
+    return parsed_moves
 
 def train_checkers_model(Opponent="itself"):
     model = create_keras_model()
@@ -52,7 +80,7 @@ def train_checkers_model(Opponent="itself"):
         for g in range(10):
             temp_data = []
             game = checkers.Checkers()
-            player = 1
+            player = 1  # Start with player 1 (white)
             count = 0
 
             while True:
@@ -61,40 +89,34 @@ def train_checkers_model(Opponent="itself"):
                     draw += 1
                     break
 
-                if player == 1:
-                    # Get the board state and compress it
-                    board_state = game.board  # Shape (10, 10)
-                    compressed_board = game.CompressBoard(player, board_state).flatten()  # Shape (50,)
-                    # Get the top 3 moves from the LLM
-                    candidate_moves = get_top_moves_from_llm(compressed_board.tolist(), num_moves=3)
-                    # Evaluate the 3 moves and choose the best
-                    leafs = []
-                    for move in candidate_moves:
-                        # Get board tensor representation
-                        board_tensor = tf.constant(np.array(move[:5]), dtype=tf.float32)
-                        leafs.append((move, board_tensor))
+                # Get the features for the current player
+                features = game.GetFeatures(player)
+                print(f"Features for player {player}: {features}")
 
-                    if len(leafs) == 0:
-                        lose += 1
-                        break
+                # Get the top 3 moves from the LLM
+                candidate_moves = get_top_moves_from_llm(features, player, num_moves=3)
 
-                    # Get model scores for the 3 moves
-                    Leaf = tf.stack([leaf[1] for leaf in leafs])
-                    scores = model.predict_on_batch(Leaf)
-                    best_index = np.argmax(scores)
-                    best_move = leafs[best_index][0]
-                    game.PushMove(best_move)
-                    temp_data.append(leafs[best_index][1])
+                if len(candidate_moves) == 0:
+                    lose += 1
+                    break
 
-                else:
-                    legal_moves = game.GetValidMoves(player)
-                    move = random.choice(legal_moves) if legal_moves else None
-                    if move:
-                        game.PushMove(move)
-                    else:
-                        win += 1
-                        break
+                # Get model scores for the 3 moves
+                scores = []
+                for move in candidate_moves:
+                    compressed_move = game.CompressBoard(player, game.board)
+                    tensor_move = tf.constant(compressed_move.flatten(), dtype=tf.float32)
+                    score = model.predict_on_batch(tf.reshape(tensor_move, (1, 5)))
+                    scores.append(score)
 
+                # Choose the best move based on scores
+                best_index = np.argmax(scores)
+                best_move = candidate_moves[best_index]
+
+                # Apply the best move
+                game.PushMove(best_move)
+                temp_data.append(compressed_move)
+
+                # Check if the game has ended
                 end = game.EndGame()
                 if end in [1, -1]:
                     reward = 10 if end == 1 else -10
@@ -110,7 +132,7 @@ def train_checkers_model(Opponent="itself"):
                     labels.extend(temp_labels)
                     break
 
-                player = -player
+                player = -player  # Switch player after each turn
 
         if data:
             data_tensor = tf.constant(np.array(data), dtype=tf.float32)
