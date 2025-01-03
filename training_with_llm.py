@@ -57,10 +57,11 @@ def train_checkers_model(Opponent="itself"):
                     break
 
                 if player == 1:
-                    # Get the board state and ask LLM for top 3 moves
-                    board_state = game.get_board_state()
-                    candidate_moves = get_top_moves_from_llm(board_state, num_moves=3)
-
+                    # Get the board state and compress it
+                    board_state = game.board  # Shape (10, 10)
+                    compressed_board = game.CompressBoard(player, board_state).flatten()  # Shape (50,)
+                    # Get the top 3 moves from the LLM
+                    candidate_moves = get_top_moves_from_llm(compressed_board.tolist(), num_moves=3)
                     # Evaluate the 3 moves and choose the best
                     leafs = []
                     for move in candidate_moves:
