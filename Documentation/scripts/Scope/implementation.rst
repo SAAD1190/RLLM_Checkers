@@ -2,7 +2,7 @@ Implementation Details
 ========================
 
 .. figure:: /Documentation/images/architecture.png
-   :width: 700
+   :width: 900
    :align: center
    :alt: architecture
 

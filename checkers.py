@@ -190,49 +190,89 @@ class Checkers:
         
         return SimpleMoves, AllPath
  
-    def MovePawn(self, x, y, pawn, OnlyEat=False, eatten=[], AllPath = [], path=[]):
+    # def MovePawn(self, x, y, pawn, OnlyEat=False, eatten=[], AllPath = [], path=[]):
+    #     SimpleMoves = []
+    #     eat = False
+    #     if not OnlyEat : path = []; AllPath = []
+    #     path.append((x, y))
+    #     if self.IsOnBoard(x-pawn, y+1) and self.IsEmpty(x-pawn, y+1):
+    #         if not OnlyEat : SimpleMoves.append(((x, y), (x-pawn, y+1)))
+    #     elif self.IsOnBoard(x-pawn, y+1) and self.IsOnBoard(x+2*(-pawn), y+2) and self.IsEmpty(x+2*(-pawn), y+2) and not((x-pawn, y+1) in eatten):
+    #         if not self.IsSameSign(pawn, self.board[x-pawn][y+1]) : 
+    #             eatten2 = eatten.copy()
+    #             eatten2.append((x-pawn, y+1))
+    #             self.MovePawn(x+2*(-pawn), y+2, pawn, eatten=eatten2, OnlyEat=True, AllPath=AllPath, path=path.copy())
+    #             eat = True
+    #     if self.IsOnBoard(x-pawn, y-1) and self.IsEmpty(x-pawn, y-1):
+    #         if not OnlyEat : SimpleMoves.append(((x, y), (x-pawn, y-1)))
+    #     elif self.IsOnBoard(x-pawn, y-1) and self.IsOnBoard(x+2*(-pawn), y-2) and self.IsEmpty(x+2*(-pawn), y-2) and not((x-pawn, y-1) in eatten):
+    #         if not self.IsSameSign(pawn, self.board[x-pawn][y-1]) : 
+    #             eatten2 = eatten.copy()
+    #             eatten2.append((x-pawn, y-1))
+    #             self.MovePawn(x+2*(-pawn), y-2, pawn, eatten=eatten2, OnlyEat=True, AllPath=AllPath, path=path.copy())
+    #             eat = True
+    #     # Backward
+    #     if self.IsOnBoard(x+pawn, y+1) and self.IsEmpty(x+pawn, y+1):
+    #         pass
+    #     elif self.IsOnBoard(x+pawn, y+1) and self.IsOnBoard(x+2*pawn, y+2) and self.IsEmpty(x+2*pawn, y+2) and not((x+pawn, y+1) in eatten):
+    #         if not self.IsSameSign(pawn, self.board[x+pawn][y+1]) : 
+    #             eatten2 = eatten.copy()
+    #             eatten2.append((x+pawn, y+1))
+    #             self.MovePawn(x+2*pawn, y+2, pawn, eatten=eatten2, OnlyEat=True, AllPath=AllPath, path=path.copy())
+    #             eat = True
+
+    #     if self.IsOnBoard(x+pawn, y-1) and self.IsEmpty(x+pawn, y-1):
+    #         pass
+    #     elif self.IsOnBoard(x+pawn, y-1) and self.IsOnBoard(x+2*pawn, y-2) and self.IsEmpty(x+2*pawn, y-2) and not((x+pawn, y-1) in eatten):
+    #         if not self.IsSameSign(pawn, self.board[x+pawn][y-1]) : 
+    #             eatten2 = eatten.copy()
+    #             eatten2.append((x+pawn, y-1))
+    #             self.MovePawn(x+2*pawn, y-2, pawn, eatten=eatten2, OnlyEat=True, AllPath=AllPath, path=path.copy())
+    #             eat = True
+        
+    #     if not eat and len(path) > 1 : AllPath.append(path)
+
+    #     return SimpleMoves, AllPath
+
+    def MovePawn(self, x, y, pawn, OnlyEat=False, eatten=[], AllPath=[], path=[]):
         SimpleMoves = []
         eat = False
-        if not OnlyEat : path = []; AllPath = []
+        if not OnlyEat:
+            path = []
+            AllPath = []
         path.append((x, y))
-        if self.IsOnBoard(x-pawn, y+1) and self.IsEmpty(x-pawn, y+1):
-            if not OnlyEat : SimpleMoves.append(((x, y), (x-pawn, y+1)))
-        elif self.IsOnBoard(x-pawn, y+1) and self.IsOnBoard(x+2*(-pawn), y+2) and self.IsEmpty(x+2*(-pawn), y+2) and not((x-pawn, y+1) in eatten):
-            if not self.IsSameSign(pawn, self.board[x-pawn][y+1]) : 
+        
+        # Forward-right move
+        if self.IsOnBoard(x - pawn, y + 1) and self.IsEmpty(x - pawn, y + 1):
+            if not OnlyEat:
+                SimpleMoves.append(((x, y), (x - pawn, y + 1)))
+
+        # Forward-right eat (no backward eating)
+        elif self.IsOnBoard(x - pawn, y + 1) and self.IsOnBoard(x - 2 * pawn, y + 2) and self.IsEmpty(x - 2 * pawn, y + 2):
+            if not self.IsSameSign(pawn, self.board[x - pawn][y + 1]):
                 eatten2 = eatten.copy()
-                eatten2.append((x-pawn, y+1))
-                self.MovePawn(x+2*(-pawn), y+2, pawn, eatten=eatten2, OnlyEat=True, AllPath=AllPath, path=path.copy())
-                eat = True
-        if self.IsOnBoard(x-pawn, y-1) and self.IsEmpty(x-pawn, y-1):
-            if not OnlyEat : SimpleMoves.append(((x, y), (x-pawn, y-1)))
-        elif self.IsOnBoard(x-pawn, y-1) and self.IsOnBoard(x+2*(-pawn), y-2) and self.IsEmpty(x+2*(-pawn), y-2) and not((x-pawn, y-1) in eatten):
-            if not self.IsSameSign(pawn, self.board[x-pawn][y-1]) : 
-                eatten2 = eatten.copy()
-                eatten2.append((x-pawn, y-1))
-                self.MovePawn(x+2*(-pawn), y-2, pawn, eatten=eatten2, OnlyEat=True, AllPath=AllPath, path=path.copy())
-                eat = True
-        # Backward
-        if self.IsOnBoard(x+pawn, y+1) and self.IsEmpty(x+pawn, y+1):
-            pass
-        elif self.IsOnBoard(x+pawn, y+1) and self.IsOnBoard(x+2*pawn, y+2) and self.IsEmpty(x+2*pawn, y+2) and not((x+pawn, y+1) in eatten):
-            if not self.IsSameSign(pawn, self.board[x+pawn][y+1]) : 
-                eatten2 = eatten.copy()
-                eatten2.append((x+pawn, y+1))
-                self.MovePawn(x+2*pawn, y+2, pawn, eatten=eatten2, OnlyEat=True, AllPath=AllPath, path=path.copy())
+                eatten2.append((x - pawn, y + 1))
+                self.MovePawn(x - 2 * pawn, y + 2, pawn, eatten=eatten2, OnlyEat=True, AllPath=AllPath, path=path.copy())
                 eat = True
 
-        if self.IsOnBoard(x+pawn, y-1) and self.IsEmpty(x+pawn, y-1):
-            pass
-        elif self.IsOnBoard(x+pawn, y-1) and self.IsOnBoard(x+2*pawn, y-2) and self.IsEmpty(x+2*pawn, y-2) and not((x+pawn, y-1) in eatten):
-            if not self.IsSameSign(pawn, self.board[x+pawn][y-1]) : 
+        # Forward-left move
+        if self.IsOnBoard(x - pawn, y - 1) and self.IsEmpty(x - pawn, y - 1):
+            if not OnlyEat:
+                SimpleMoves.append(((x, y), (x - pawn, y - 1)))
+
+        # Forward-left eat (no backward eating)
+        elif self.IsOnBoard(x - pawn, y - 1) and self.IsOnBoard(x - 2 * pawn, y - 2) and self.IsEmpty(x - 2 * pawn, y - 2):
+            if not self.IsSameSign(pawn, self.board[x - pawn][y - 1]):
                 eatten2 = eatten.copy()
-                eatten2.append((x+pawn, y-1))
-                self.MovePawn(x+2*pawn, y-2, pawn, eatten=eatten2, OnlyEat=True, AllPath=AllPath, path=path.copy())
+                eatten2.append((x - pawn, y - 1))
+                self.MovePawn(x - 2 * pawn, y - 2, pawn, eatten=eatten2, OnlyEat=True, AllPath=AllPath, path=path.copy())
                 eat = True
-        
-        if not eat and len(path) > 1 : AllPath.append(path)
+
+        if not eat and len(path) > 1:
+            AllPath.append(path)
 
         return SimpleMoves, AllPath
+
 
     def GetValidMoveFromPawn(self, x, y):
         moves = []

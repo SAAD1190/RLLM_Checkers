@@ -122,11 +122,9 @@ def train_checkers_model(Opponent="itself"):
         keras_path = os.path.join(model_dir, f"{Opponent}.keras")
         model.save(keras_path)
 
-    # Affichage des courbes
     indices = list(range(len(winrates)))
     plt.figure(figsize=(15, 5))
     
-    # Courbe des taux de victoires
     plt.subplot(1, 3, 1)
     plt.plot(indices, winrates, marker='o', linestyle='-', label='Win Rate')
     plt.title('Win Rates')
@@ -134,7 +132,6 @@ def train_checkers_model(Opponent="itself"):
     plt.ylabel('Wins [%]')
     plt.legend()
 
-    # Courbe des pertes moyennes
     plt.subplot(1, 3, 2)
     plt.plot(indices, avg_losses, marker='o', linestyle='-', color='orange', label='Avg Loss')
     plt.title('Average Loss per Generation')
@@ -142,7 +139,6 @@ def train_checkers_model(Opponent="itself"):
     plt.ylabel('Loss')
     plt.legend()
 
-    # Courbe des récompenses moyennes
     plt.subplot(1, 3, 3)
     plt.plot(indices, avg_rewards, marker='o', linestyle='-', color='green', label='Avg Reward')
     plt.title('Average Reward per Generation')
