@@ -10,8 +10,8 @@ import os
 from transformers import GPTNeoForCausalLM, GPT2Tokenizer
 
 # Initialize LLM (GPT-Neo 2.7B)
-model_name = "EleutherAI/gpt-neo-2.7B"  # Larger GPT-Neo model
-llm_model = GPTNeoForCausalLM.from_pretrained(model_name)
+model_name = "EleutherAI/gpt-neo-2.7B"
+llm_model = GPTNeoForCausalLM.from_pretrained(model_name, torch_dtype=torch.float16).cuda()  # Enable GPU & FP16 for memory efficiency
 tokenizer = GPT2Tokenizer.from_pretrained(model_name)
 
 # Keras model for board evaluation
@@ -23,36 +23,49 @@ def create_keras_model():
     model.compile(optimizer='nadam', loss='mean_squared_error', metrics=["mae"])
     return model
 
-def get_top_moves_from_llm(features, player, num_moves=3):
+def board_to_string(board):
     """
-    Get the top N moves from LLM based on the current board features.
+    Convert the checkers board into a formatted string.
+    """
+    board_str = "\n".join([" ".join([str(int(cell)) for cell in row]) for row in board])
+    return board_str
+
+def get_top_moves_from_llm(board, player, num_moves=3):
+    """
+    Get the top N moves from LLM based on the current board state.
     """
     player_name = "white" if player == 1 else "black"
-    formatted_features = ", ".join([f"Feature {i}: {v:.2f}" for i, v in enumerate(features)])
     
-    # Add example moves to the prompt to guide the LLM.
+    # Convert board state to string
+    formatted_board = board_to_string(board)
+    
+    # Add example moves to the prompt
     example_moves = """
     Examples of valid moves:
     - (2, 3) -> (4, 5)
     - (6, 7) -> (5, 6)
     - (1, 2) -> (3, 4)
     """
+    
+    # Create the prompt
     prompt = f"""
-    Game features: {formatted_features}
+    Current board state:
+    {formatted_board}
+    Player: {player_name}
     Suggest the top {num_moves} best moves for {player_name} in the format (x1, y1) -> (x2, y2).
     {example_moves}
     """
-
+    
     print(f"LLM Prompt: {prompt[:300]}...")  # For debugging
-
+    
     try:
         inputs = tokenizer(prompt, return_tensors="pt")
+        inputs = {k: v.cuda() for k, v in inputs.items()}  # Ensure inputs are on GPU
         outputs = llm_model.generate(
             **inputs,
             max_new_tokens=50,
-            temperature=0.7,  # Keep the randomness low
-            top_k=50,  # Sampling from the top 50 candidates
-            do_sample=True,  # Enable sampling to make use of temperature
+            temperature=0.7,
+            top_k=50,
             pad_token_id=tokenizer.eos_token_id,
         )
         prediction = tokenizer.decode(outputs[0], skip_special_tokens=True)
@@ -88,6 +101,7 @@ def parse_llm_move(move_str):
         print(f"Failed to parse LLM move: {move_str}, error: {e}")
         return None
 
+
 def train_checkers_model(Opponent="itself"):
     model = create_keras_model()
     winrates, avg_losses, avg_rewards = [], [], []
@@ -109,12 +123,12 @@ def train_checkers_model(Opponent="itself"):
                     draw += 1
                     break
 
-                # Get the features for the current player
-                features = game.GetFeatures(player)
-                print(f"Features for player {player}: {features}")
+                # Get the board for the current player
+                board = game.board
+                print(f"Board for player {player}: \n{board}")
 
                 # Get the top 3 moves from the LLM
-                candidate_moves = get_top_moves_from_llm(features, player, num_moves=3)
+                candidate_moves = get_top_moves_from_llm(board, player, num_moves=3)
 
                 if len(candidate_moves) == 0:
                     lose += 1
