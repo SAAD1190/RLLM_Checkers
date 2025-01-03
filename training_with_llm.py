@@ -10,7 +10,7 @@ import os
 from transformers import GPTNeoForCausalLM, GPT2Tokenizer
 
 # Initialize LLM (GPT-Neo 2.7B)
-model_name = "EleutherAI/gpt-neo-2.7B"  # Switch to the larger 2.7B model
+model_name = "EleutherAI/gpt-neo-2.7B"  # Larger GPT-Neo model
 llm_model = GPTNeoForCausalLM.from_pretrained(model_name)
 tokenizer = GPT2Tokenizer.from_pretrained(model_name)
 
@@ -50,8 +50,9 @@ def get_top_moves_from_llm(features, player, num_moves=3):
         outputs = llm_model.generate(
             **inputs,
             max_new_tokens=50,
-            temperature=0.7,  # Lower temperature to reduce randomness
-            top_k=50,  # Use top-k sampling
+            temperature=0.7,  # Keep the randomness low
+            top_k=50,  # Sampling from the top 50 candidates
+            do_sample=True,  # Enable sampling to make use of temperature
             pad_token_id=tokenizer.eos_token_id,
         )
         prediction = tokenizer.decode(outputs[0], skip_special_tokens=True)
@@ -86,7 +87,6 @@ def parse_llm_move(move_str):
     except Exception as e:
         print(f"Failed to parse LLM move: {move_str}, error: {e}")
         return None
-
 
 def train_checkers_model(Opponent="itself"):
     model = create_keras_model()
