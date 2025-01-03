@@ -3,18 +3,15 @@ import numpy as np
 import tensorflow as tf
 from keras.models import load_model
 import logging
-import checkers
-
-#! Before Thursday 21H00: Enhance game vizualization and rules compliance
-#TODO Enhance game vizualization and rules compliance
+from checkers import Checkers  # Importing the provided environment
 
 # Initialize Pygame and configure logging
 pygame.init()
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 
 # Game constants
-WIDTH, HEIGHT = 600, 600
-ROWS, COLS = 8, 8
+WIDTH, HEIGHT = 800, 800  # Adjusted to match a 10x10 board
+ROWS, COLS = 10, 10
 SQUARE_SIZE = WIDTH // COLS
 
 # Colors
@@ -39,10 +36,14 @@ def draw_pieces(win, game):
     for row in range(ROWS):
         for col in range(COLS):
             piece = game.board[row][col]
-            if piece == 1:  # White piece
+            if piece == 1:  # White pawn
                 pygame.draw.circle(win, WHITE, (col * SQUARE_SIZE + SQUARE_SIZE // 2, row * SQUARE_SIZE + SQUARE_SIZE // 2), SQUARE_SIZE // 3)
-            elif piece == -1:  # Red piece
+            elif piece == 2:  # White queen
+                pygame.draw.circle(win, WHITE, (col * SQUARE_SIZE + SQUARE_SIZE // 2, row * SQUARE_SIZE + SQUARE_SIZE // 2), SQUARE_SIZE // 2, 2)
+            elif piece == -1:  # Red pawn
                 pygame.draw.circle(win, RED, (col * SQUARE_SIZE + SQUARE_SIZE // 2, row * SQUARE_SIZE + SQUARE_SIZE // 2), SQUARE_SIZE // 3)
+            elif piece == -2:  # Red queen
+                pygame.draw.circle(win, RED, (col * SQUARE_SIZE + SQUARE_SIZE // 2, row * SQUARE_SIZE + SQUARE_SIZE // 2), SQUARE_SIZE // 2, 2)
 
 # Load the AI model
 def load_checkers_model(model_path):
@@ -56,23 +57,36 @@ def load_checkers_model(model_path):
 
 # Get AI move using the model
 def get_ai_move(game, player, model):
-    leafs = game.minmax(player, RL=True)  # Generate possible moves
+    leafs = game.minmax(player, RL=True)
     if len(leafs) == 0:
+        logging.warning("No valid moves available for the AI.")
         return None
 
-    Leaf = tf.zeros((len(leafs), 5))
-    for l in range(len(leafs)):
-        tensor = leafs[l][2]
-        Leaf = tf.tensor_scatter_nd_update(Leaf, [[l]], [tensor[:5]])
+    valid_leafs = []
+    for leaf in leafs:
+        if isinstance(leaf[2], np.ndarray) and leaf[2].shape == (10, 10):
+            valid_leafs.append(leaf)
+        else:
+            logging.warning(f"Invalid board state encountered: {type(leaf[2])}, shape {getattr(leaf[2], 'shape', None)}")
+
+    if not valid_leafs:
+        logging.error("No valid board states for AI to evaluate.")
+        return None
+
+    Leaf = tf.zeros((len(valid_leafs), 50))
+    for l, leaf in enumerate(valid_leafs):
+        tensor = game.CompressBoard(player, leaf[2])
+        Leaf = tf.tensor_scatter_nd_update(Leaf, [[l]], [tensor.flatten()])
 
     scores = model.predict_on_batch(Leaf)
     i = np.argmax(scores)
-    return leafs[i][0]
+    return valid_leafs[i][0]
 
 # Handle human player moves
 def handle_player_move(game, player):
     moves = game.GetValidMoves(player, Filter=True)
     if not moves:
+        logging.warning("No valid moves available for the player.")
         return None
 
     selected_piece = None
@@ -81,6 +95,7 @@ def handle_player_move(game, player):
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
+                logging.info("Game quit by player.")
                 return None
 
             if event.type == pygame.MOUSEBUTTONDOWN:
@@ -88,13 +103,11 @@ def handle_player_move(game, player):
                 row, col = pos[1] // SQUARE_SIZE, pos[0] // SQUARE_SIZE
 
                 if selected_piece is None:
-                    # Select a piece
                     for move in moves:
                         if move[0] == (row, col):
                             selected_piece = (row, col)
                             break
                 else:
-                    # Select a destination
                     for move in moves:
                         if move[0] == selected_piece and move[1] == (row, col):
                             selected_move = move
@@ -103,7 +116,7 @@ def handle_player_move(game, player):
 # Main game loop
 def main(model_path):
     clock = pygame.time.Clock()
-    game = checkers.Checkers()
+    game = Checkers()
     model = load_checkers_model(model_path)
 
     if model is None:
@@ -128,6 +141,9 @@ def main(model_path):
             ai_move = get_ai_move(game, player, model)
             if ai_move:
                 game.PushMove(ai_move)
+            else:
+                logging.error("AI could not make a move. Ending game.")
+                break
             player = 1
 
         # Check for game end
