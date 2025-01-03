@@ -3,6 +3,16 @@ Interactive Interface
 
 This section provides an overview of the interactive interface for playing the checkers game, which combines a graphical board display and AI-assisted gameplay.
 
+How to Play the Checkers Game
+--------
+
+Here’s a short demonstration:
+
+.. image:: path/to/your/demo.gif
+   :alt: Checkers Gameplay Demo
+   :align: center
+
+
 Overview
 --------
 
