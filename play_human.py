@@ -55,7 +55,7 @@ def load_checkers_model(model_path):
         logging.error(f"Error loading model: {e}")
         return None
 
-# Get AI move using the model
+# Get AI move using the trained model
 def get_ai_move(game, player, model):
     leafs = game.minmax(player, RL=True)
     if len(leafs) == 0:
@@ -64,23 +64,23 @@ def get_ai_move(game, player, model):
 
     valid_leafs = []
     for leaf in leafs:
-        if isinstance(leaf[2], np.ndarray) and leaf[2].shape == (10, 10):
-            valid_leafs.append(leaf)
+        if isinstance(leaf[2], np.ndarray) and len(leaf[2]) >= 5:  # Ensure at least 5 features for the model input
+            features = leaf[2][:5]  # Compress board to match model input size
+            valid_leafs.append((leaf[0], features))
         else:
-            logging.warning(f"Invalid board state encountered: {type(leaf[2])}, shape {getattr(leaf[2], 'shape', None)}")
+            logging.warning(f"Skipping invalid board state with shape {leaf[2].shape if isinstance(leaf[2], np.ndarray) else 'unknown'}.")
 
     if not valid_leafs:
         logging.error("No valid board states for AI to evaluate.")
         return None
 
-    Leaf = tf.zeros((len(valid_leafs), 50))
-    for l, leaf in enumerate(valid_leafs):
-        tensor = game.CompressBoard(player, leaf[2])
-        Leaf = tf.tensor_scatter_nd_update(Leaf, [[l]], [tensor.flatten()])
+    Leaf = np.array([v[1] for v in valid_leafs])  # Collect compressed features for all valid leafs
+    scores = model.predict_on_batch(Leaf)  # Use the model to predict scores
+    i = np.argmax(scores)  # Choose the move with the highest score
+    return valid_leafs[i][0]  # Return the corresponding move
 
-    scores = model.predict_on_batch(Leaf)
-    i = np.argmax(scores)
-    return valid_leafs[i][0]
+
+
 
 # Handle human player moves
 def handle_player_move(game, player):
