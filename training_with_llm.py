@@ -9,8 +9,8 @@ from tqdm import tqdm
 import os
 from transformers import GPTNeoForCausalLM, GPT2Tokenizer
 
-# Initialize LLM (GPT-Neo)
-model_name = "EleutherAI/gpt-neo-125M"
+# Initialize LLM (GPT-Neo 2.7B)
+model_name = "EleutherAI/gpt-neo-2.7B"  # Switch to the larger 2.7B model
 llm_model = GPTNeoForCausalLM.from_pretrained(model_name)
 tokenizer = GPT2Tokenizer.from_pretrained(model_name)
 
