@@ -1,16 +1,22 @@
 import checkers
 import matplotlib.pyplot as plt
 import torch
-from transformers import GPTNeoXForCausalLM, GPT2Tokenizer
 import numpy as np
 import random
 from tqdm import tqdm
 import os
+from transformers import AutoConfig
+from transformers import GPTNeoForCausalLM, GPT2Tokenizer
 
-# Initialize GPT-NeoX Model
+# Use GPTNeo instead of GPTNeoX for the 2.7B model
 model_name = "EleutherAI/gpt-neo-2.7B"
-model = GPTNeoXForCausalLM.from_pretrained(model_name)
+model = GPTNeoForCausalLM.from_pretrained(model_name)  # Fix: Use GPTNeo
 tokenizer = GPT2Tokenizer.from_pretrained(model_name)
+
+# Function to check configuration
+config = AutoConfig.from_pretrained(model_name)
+print(config)  # Inspect hidden_size and other config attributes
+
 
 def concatenate(array1, array2):
     for i in range(len(array2)):
