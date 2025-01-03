@@ -7,7 +7,7 @@ import random
 from tqdm import tqdm
 import os
 
-#Initialize GPT-NeoX Model
+# Initialize GPT-NeoX Model
 model_name = "EleutherAI/gpt-neo-2.7B"
 model = GPTNeoXForCausalLM.from_pretrained(model_name)
 tokenizer = GPT2Tokenizer.from_pretrained(model_name)
@@ -17,130 +17,143 @@ def concatenate(array1, array2):
         array1.append(array2[i])
     return array1  
 
-def get_move_from_llm(board_state):
+def get_top_moves_from_llm(board_state, num_moves=3):
     """
-    This function prepares the board state as text input for the GPT-NeoX model
-    and retrieves the predicted move from the model.
+    Get the top N moves from GPT-NeoX model based on the current board state.
     """
-    prompt = f"Game board: {board_state}\nPlayer 1's move:"
+    prompt = f"Game board: {board_state}\nSuggest the top {num_moves} best moves:"
     
     # Tokenize the prompt
     inputs = tokenizer(prompt, return_tensors="pt")
     
-    # Get model prediction
-    outputs = model.generate(**inputs, max_length=50, num_return_sequences=1)
+    # Generate LLM output
+    outputs = model.generate(**inputs, max_length=150, num_return_sequences=1)
     prediction = tokenizer.decode(outputs[0], skip_special_tokens=True)
     
-    # Extract the predicted move from the text (you would need to fine-tune this part)
-    move = prediction.split('\n')[-1]
-    return move
+    # Extract moves from output
+    lines = prediction.split("\n")
+    moves = [line.split(":")[-1].strip() for line in lines if ":" in line][-num_moves:]  # Extract last `num_moves`
+    return moves
+
+def evaluate_moves_and_choose_best(game, candidate_moves):
+    """
+    Evaluate the 3 moves and choose the best based on game simulation.
+    """
+    best_move = None
+    best_score = float('-inf')
+
+    for move in candidate_moves:
+        temp_game = game.clone()  # Clone the game to simulate without affecting the actual game
+        try:
+            temp_game.PushMove(move)  # Apply the move
+            score = temp_game.evaluate_board()  # Assume a method exists to evaluate the board state
+        except:
+            score = -float('inf')  # If move is invalid, assign very low score
+        
+        if score > best_score:
+            best_score = score
+            best_move = move
+
+    return best_move
 
 def train_checkers_model(Opponent="itself"):
-    data = [] 
-    labels = np.zeros(1)
-    winrates = []
-    avg_losses = []  # Stocker les moyennes des pertes
-    avg_rewards = []  # Stocker les moyennes des récompenses
+    winrates, avg_losses, avg_rewards = [], [], []
     learning_rate = 0.5
     discount_factor = 0.95
-    exploration = 0.95
     win, lose, draw = 0, 0, 0
 
-    for generations in tqdm(range(25)):
+    for generations in tqdm(range(5)):
         data = []
-        generation_losses = []  # Liste des pertes pour cette génération
-        generation_rewards = []  # Liste des récompenses pour cette génération
+        generation_losses, generation_rewards = [], []
 
         for g in range(10):
             temp_data = []
             game = checkers.Checkers()
             player = 1
             count = 0
+
             while True:
                 count += 1
-                end2 = 0
-                if count > 1000:
+                if count > 1000:  # Draw condition
                     draw += 1
                     break
-                else:
-                    if player == 1: 
-                        # Get the board state
-                        board_state = game.get_board_state()
-                        # Get the predicted move from GPT-NeoX
-                        move = get_move_from_llm(board_state)
+
+                if player == 1:
+                    # Get the board state
+                    board_state = game.get_board_state()
+
+                    # Get the top 3 moves from the LLM
+                    candidate_moves = get_top_moves_from_llm(board_state, num_moves=3)
+                    
+                    # Choose the best move from the 3
+                    move = evaluate_moves_and_choose_best(game, candidate_moves)
+
+                    if move:
                         game.PushMove(move)
-                        temp_data.append(board_state)
-                    elif player == -1:
-                        # Handle opponent moves
-                        ...
+                        temp_data.append((board_state, move))
+                else:
+                    # Opponent's move (random or heuristic-based)
+                    legal_moves = game.get_legal_moves()
+                    move = random.choice(legal_moves) if legal_moves else None
+                    if move:
+                        game.PushMove(move)
 
                 end = game.EndGame()
+                if end in [1, -1]:
+                    reward = 10 if end == 1 else -10
+                    win += (end == 1)
+                    lose += (end == -1)
+                    generation_rewards.append(reward)
 
-                if end == 1 or end2 == 1:
-                    win += 1
-                    reward = 10
-                    generation_rewards.append(reward)  # Enregistrer la récompense
-                    temp_tensor = torch.constant(temp_data[1:])
-                    old_prediction = model.predict_on_batch(temp_tensor)
-                    optimal_futur_value = np.ones(old_prediction.shape)
+                    temp_tensor = torch.tensor([t[0] for t in temp_data])
+                    old_prediction = model(temp_tensor).detach().numpy()
+                    optimal_futur_value = np.ones_like(old_prediction) * (1 if end == 1 else -1)
                     loss = learning_rate * (reward + discount_factor * optimal_futur_value - old_prediction)
-                    generation_losses.append(loss.mean().item())  # Enregistrer la perte moyenne
+                    generation_losses.append(loss.mean().item())
+
                     temp_labels = old_prediction + loss
-                    data = concatenate(data, temp_data[1:])
-                    labels = np.vstack((labels, temp_labels))
+                    data.extend([t[0] for t in temp_data])
+                    labels = np.vstack((np.zeros(1), temp_labels))
                     break
 
-                elif end == -1 or end2 == -1:
-                    lose += 1
-                    reward = -10
-                    generation_rewards.append(reward)  # Enregistrer la récompense
-                    temp_tensor = torch.constant(temp_data[1:])
-                    old_prediction = model.predict_on_batch(temp_tensor)
-                    optimal_futur_value = -1 * np.ones(old_prediction.shape)
-                    loss = learning_rate * (reward + discount_factor * optimal_futur_value - old_prediction)
-                    generation_losses.append(loss.mean().item())  # Enregistrer la perte moyenne
-                    temp_labels = old_prediction + loss
-                    data = concatenate(data, temp_data[1:])
-                    labels = np.vstack((labels, temp_labels))
-                    break
+                player = -player
 
-                player = -player 
-        
-        data = torch.constant(data)
-        model.fit(data[1:], labels[2:], epochs=16, batch_size=256, verbose=0)
-        labels = np.zeros(1)
-        winrate = int((win)/(win+draw+lose)*100)
+        data_tensor = torch.tensor(data)
+        labels_tensor = torch.tensor(labels[1:])
+        model.train()  # Enable training mode
+        # Example optimizer usage (e.g., Adam)
+        optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+        optimizer.zero_grad()
+        loss = torch.nn.functional.mse_loss(model(data_tensor), labels_tensor)
+        loss.backward()
+        optimizer.step()
+
+        winrate = int(win / (win + draw + lose + 1e-5) * 100)
         winrates.append(winrate)
-        
-        # Calculer les moyennes des pertes et des récompenses
         avg_losses.append(np.mean(generation_losses))
         avg_rewards.append(np.mean(generation_rewards))
 
-        # Save model in both formats
         model_dir = "models"
         os.makedirs(model_dir, exist_ok=True)
-        keras_path = os.path.join(model_dir, f"{Opponent}.keras")
-        model.save(keras_path)
+        model.save_pretrained(os.path.join(model_dir, f"{Opponent}.gpt"))
 
-    indices = list(range(len(winrates)))
     plt.figure(figsize=(15, 5))
-    
     plt.subplot(1, 3, 1)
-    plt.plot(indices, winrates, marker='o', linestyle='-', label='Win Rate')
+    plt.plot(range(len(winrates)), winrates, marker='o', linestyle='-', label='Win Rate')
     plt.title('Win Rates')
     plt.xlabel('Generations')
     plt.ylabel('Wins [%]')
     plt.legend()
 
     plt.subplot(1, 3, 2)
-    plt.plot(indices, avg_losses, marker='o', linestyle='-', color='orange', label='Avg Loss')
+    plt.plot(range(len(avg_losses)), avg_losses, marker='o', linestyle='-', color='orange', label='Avg Loss')
     plt.title('Average Loss per Generation')
     plt.xlabel('Generations')
     plt.ylabel('Loss')
     plt.legend()
 
     plt.subplot(1, 3, 3)
-    plt.plot(indices, avg_rewards, marker='o', linestyle='-', color='green', label='Avg Reward')
+    plt.plot(range(len(avg_rewards)), avg_rewards, marker='o', linestyle='-', color='green', label='Avg Reward')
     plt.title('Average Reward per Generation')
     plt.xlabel('Generations')
     plt.ylabel('Reward')
