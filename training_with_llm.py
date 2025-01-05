@@ -59,6 +59,19 @@ import matplotlib.pyplot as plt
 import torch
 from transformers import GPT2LMHeadModel, GPT2Tokenizer
 
+from transformers import AutoTokenizer, AutoModelForCausalLM
+import torch
+
+# Load LLaMA 2 13B model
+model_name = "meta-llama/Llama-2-13b-chat-hf"
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype="auto")
+
+# Move the model to GPU if available
+device = "cuda" if torch.cuda.is_available() else "cpu"
+model = model.to(device)
+
+
 
 def format_board_state(board_state):
     """
@@ -67,24 +80,10 @@ def format_board_state(board_state):
     formatted_board = "\n".join([" ".join([f"{int(cell):2}" for cell in row]) for row in board_state])
     return formatted_board
 
-
-
-
-
-# Load the GPT-2 model and tokenizer
-model_name = "gpt2-large"
-tokenizer = GPT2Tokenizer.from_pretrained(model_name)
-model = GPT2LMHeadModel.from_pretrained(model_name)
-
 def get_top_3_actions(board_state, player):
     """
-    Get the top 3 recommended actions using GPT-2.
+    Get the top 3 recommended actions using LLaMA 2 13B.
     """
-    # Add padding token if not present
-    if tokenizer.pad_token is None:
-        tokenizer.add_special_tokens({'pad_token': tokenizer.eos_token})
-        model.resize_token_embeddings(len(tokenizer))  # Resize to reflect the new token
-
     formatted_board = format_board_state(board_state)
     prompt = f"""
     You are an expert checkers assistant. Here is the board state (10x10):
@@ -98,40 +97,37 @@ def get_top_3_actions(board_state, player):
     Only return the list—no extra text.
     """
 
-    # Encode the prompt
-    inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=512, padding="max_length")
+    # Tokenize prompt
+    inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=512, padding=True).to(device)
 
-    # Generate output
+    # Generate text
     with torch.no_grad():
         outputs = model.generate(
             inputs["input_ids"],
-            attention_mask=inputs["attention_mask"],
-            max_new_tokens=100,
-            temperature=0.7,
+            max_new_tokens=200,
+            temperature=0.5,
             top_p=0.9,
-            do_sample=True,
-            pad_token_id=tokenizer.pad_token_id  # Use the pad_token added earlier
+            do_sample=True
         )
 
-    # Decode the output
+    # Decode output
     generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
-    print(f"Generated text from GPT-2: {generated_text}")
+    print(f"Generated moves: {generated_text}")
 
-    # Extract and parse actions
+    # Extract list from generated text
     start_idx = generated_text.find("[")
     end_idx = generated_text.find("]")
     if start_idx == -1 or end_idx == -1:
-        print("Warning: Could not extract valid actions. Returning random actions.")
         return [random.choice([((4, 5), (3, 6)), ((6, 1), (7, 0)), ((5, 2), (3, 4))])]
 
     action_str = generated_text[start_idx:end_idx + 1]
     try:
         actions = eval(action_str)
-    except Exception as e:
-        print(f"Error parsing actions: {e}")
-        actions = [random.choice([((4, 5), (3, 6)), ((6, 1), (7, 0)), ((5, 2), (3, 4))])]
+    except:
+        return [random.choice([((4, 5), (3, 6)), ((6, 1), (7, 0)), ((5, 2), (3, 4))])]
 
-    return actions[:3]  # Return the top 3 actions
+    return actions[:3]
+
 
 
 
