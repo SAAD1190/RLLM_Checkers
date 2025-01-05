@@ -91,7 +91,7 @@ def get_top_3_actions(board_state, player, api_key):
     """
 
     # Call OpenAI API
-    response = openai.ChatCompletion.create(
+    response = openai.ChatCompletion.chat(
         model="gpt-3.5-turbo",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.3,
