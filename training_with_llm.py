@@ -88,36 +88,35 @@ def get_top_3_actions(board_state, player):
     prompt = f"""
     Here is the current 10x10 checkers board:
     {formatted_board}
-    Return the top 3 recommended moves for player {player} as a Python list in the format:
+
+    Player {player}'s turn. Return the top 3 recommended moves as a Python list in this exact format:
     [
         ((start_x, start_y), (end_x, end_y)),
         ((start_x, start_y), (end_x, end_y)),
         ((start_x, start_y), (end_x, end_y))
     ]
-    Only return the list. No explanations.
+    No text or explanations—only the list.
     """
 
-    # Add padding token if missing
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
     inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=512, padding=True).to(device)
+    attention_mask = inputs["attention_mask"]
 
-    # Generate response
     with torch.no_grad():
         outputs = model.generate(
-            inputs["input_ids"],
-            max_new_tokens=150,
-            temperature=0.2,
-            top_p=0.7,
+            input_ids=inputs["input_ids"],
+            attention_mask=attention_mask,
+            max_new_tokens=100,
+            do_sample=True,
+            temperature=0.5,
+            top_p=0.9,
             repetition_penalty=1.2,
-            do_sample=False
         )
 
     generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
-    # Debugging display
     print(generated_text)
-
 
     # Extract list from generated text
     try:
@@ -125,14 +124,13 @@ def get_top_3_actions(board_state, player):
         end_idx = generated_text.index("]") + 1
         action_str = generated_text[start_idx:end_idx]
         actions = eval(action_str)
+        if not isinstance(actions, list):
+            raise ValueError("Output is not a list.")
     except Exception as e:
         print(f"Error parsing actions: {e}")
-        actions = [((4, 5), (3, 6)), ((6, 1), (7, 0)), ((5, 2), (3, 4))]
+        actions = [((4, 5), (3, 6)), ((6, 1), (7, 0)), ((5, 2), (3, 4))]  # Default moves
 
-    return actions[:3]  # Ensure only 3 actions are returned
-
-
-
+    return actions[:3]
 
 
 def build_model():
