@@ -82,27 +82,29 @@ def get_top_3_actions(board_state, player):
     """
     formatted_board = format_board_state(board_state)
     prompt = f"""
-    You are an expert checkers assistant. Given the board state below, return only the Python list of the top 3 recommended moves for player {player}.
-    Example format:
+    based on current checkers board state:{formatted_board}Return a Python only a list of the top 3 recommended moves for player {player}, formatted like this:
     [
         ((4, 5), (3, 6)),
         ((6, 1), (7, 0)),
         ((5, 2), (3, 4))
     ]
-    Board state (10x10):
-    {formatted_board}
-    Do not add any explanations, links, or extra text. Return only the list of moves in this format.
+    no extra text.
     """
 
+
     # Encode the input and pass through GPT-2
-    inputs = tokenizer(prompt, return_tensors="pt", max_length=512, truncation=True)
+    inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=512, padding="max_length")
     outputs = model.generate(
         inputs["input_ids"],
-        max_new_tokens=120,
-        temperature=0.3,
-        do_sample=False,
-        pad_token_id=tokenizer.eos_token_id,
+        attention_mask=inputs["attention_mask"],
+        max_new_tokens=100,
+        temperature=0.7,
+        top_p=0.9,
+        do_sample=True,
+        pad_token_id=tokenizer.pad_token_id
     )
+
+
 
     # Decode the output text
     generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
