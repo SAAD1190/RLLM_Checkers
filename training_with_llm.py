@@ -57,7 +57,7 @@ import random
 import os
 import matplotlib.pyplot as plt
 import torch
-import openai
+from transformers import GPT2LMHeadModel, GPT2Tokenizer
 
 
 def format_board_state(board_state):
@@ -68,15 +68,18 @@ def format_board_state(board_state):
     return formatted_board
 
 
-import openai
 
 
-def get_top_3_actions(board_state, player, api_key):
+
+# Load the GPT-2 model and tokenizer
+model_name = "gpt2"
+tokenizer = GPT2Tokenizer.from_pretrained(model_name)
+model = GPT2LMHeadModel.from_pretrained(model_name)
+
+def get_top_3_actions(board_state, player):
     """
-    Get the top 3 recommended actions using OpenAI GPT.
+    Get the top 3 recommended actions using GPT-2 model.
     """
-    openai.api_key = api_key
-
     formatted_board = format_board_state(board_state)
     prompt = f"""
     You are an expert checkers assistant. Given the board state below, return only the Python list of the top 3 recommended moves for player {player}.
@@ -88,23 +91,24 @@ def get_top_3_actions(board_state, player, api_key):
         ((start_x, start_y), (end_x, end_y)),
         ((start_x, start_y), (end_x, end_y))
     ]
-    The format must be an exact Python list of tuples.
     """
 
-    # Make the API call using the correct method
-    response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "system", "content": "You are an expert in checkers strategy."},
-                  {"role": "user", "content": prompt}],
-        max_tokens=200,
-        temperature=0.7
+    # Encode the input and pass through GPT-2
+    inputs = tokenizer(prompt, return_tensors="pt", max_length=512, truncation=True)
+    outputs = model.generate(
+        inputs["input_ids"],
+        max_new_tokens=200,
+        temperature=0.5,
+        do_sample=True,
+        top_p=0.9,
+        pad_token_id=tokenizer.eos_token_id,
     )
 
-    # Extract the assistant's response
-    generated_text = response['choices'][0]['message']['content']
-    print(f"Generated text from LLM: {generated_text}")
+    # Decode the output text
+    generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    print(f"Generated text from GPT-2: {generated_text}")
 
-    # Extract and parse the actions
+    # Extract actions from the output text
     start_idx = generated_text.find("[")
     end_idx = generated_text.find("]")
     if start_idx == -1 or end_idx == -1:
@@ -121,10 +125,6 @@ def get_top_3_actions(board_state, player, api_key):
     return actions[:3]  # Return only the top 3 actions
 
 
-
-
-
-
 def build_model():
     """
     Build a simple Q-learning neural network model.
@@ -138,7 +138,6 @@ def build_model():
 
 
 def train_checkers_model_with_llm(Opponent="itself"):
-    api_key = input("Enter your OpenAI API key: ")
     model = build_model()
 
     winrates = []
@@ -168,7 +167,7 @@ def train_checkers_model_with_llm(Opponent="itself"):
 
                 board_state = game.board
                 # Step 1: Get LLM-suggested actions
-                top_3_actions = get_top_3_actions(board_state.tolist(), player, api_key)
+                top_3_actions = get_top_3_actions(board_state.tolist(), player)
 
                 # Step 2: Evaluate actions using the model
                 q_values = []
