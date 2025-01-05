@@ -71,10 +71,11 @@ def format_board_state(board_state):
 import openai
 
 
-def get_top_3_actions(board_state, player):
+def get_top_3_actions(board_state, player, api_key):
     """
-    Get the top 3 recommended actions using OpenAI GPT (new API interface).
+    Get the top 3 recommended actions using OpenAI GPT.
     """
+
     formatted_board = format_board_state(board_state)
     prompt = f"""
     You are an expert checkers assistant. Given the board state below, return only the Python list of the top 3 recommended moves for player {player}.
@@ -86,13 +87,14 @@ def get_top_3_actions(board_state, player):
         ((start_x, start_y), (end_x, end_y)),
         ((start_x, start_y), (end_x, end_y))
     ]
+    The format must be an exact Python list of tuples.
     """
-    
-    # Call OpenAI API using the new interface
-    response = openai.ChatCompletion.chat(
-        model="gpt-3.5-turbo",  # Or "gpt-4"
+
+    # Call OpenAI API
+    response = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",
         messages=[{"role": "user", "content": prompt}],
-        temperature=0.3,  # Low temperature for deterministic output
+        temperature=0.3,
         max_tokens=200
     )
 
@@ -119,6 +121,7 @@ def get_top_3_actions(board_state, player):
 
 
 
+
 def build_model():
     """
     Build a simple Q-learning neural network model.
@@ -132,7 +135,7 @@ def build_model():
 
 
 def train_checkers_model_with_llm(Opponent="itself"):
-    # api_key = input("Enter your OpenAI API key: ")
+    api_key = input("Enter your OpenAI API key: ")
     model = build_model()
 
     winrates = []
@@ -162,7 +165,7 @@ def train_checkers_model_with_llm(Opponent="itself"):
 
                 board_state = game.board
                 # Step 1: Get LLM-suggested actions
-                top_3_actions = get_top_3_actions(board_state.tolist(), player)
+                top_3_actions = get_top_3_actions(board_state.tolist(), player, api_key)
 
                 # Step 2: Evaluate actions using the model
                 q_values = []
