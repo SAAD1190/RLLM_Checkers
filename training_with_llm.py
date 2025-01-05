@@ -48,7 +48,6 @@ Pieces positioned in strategic areas (e.g., far rows, middle rows).
 
 
 import checkers
-import openai
 import numpy as np
 import tensorflow as tf
 from keras import Sequential, regularizers
@@ -57,15 +56,9 @@ from tqdm import tqdm
 import random
 import os
 import matplotlib.pyplot as plt
-
-from transformers import GPT2Tokenizer, GPT2LMHeadModel
 import torch
 import random
-
-
 from transformers import GPTNeoForCausalLM, AutoTokenizer
-import torch
-import random
 
 
 # Load the GPT-Neo model and tokenizer
