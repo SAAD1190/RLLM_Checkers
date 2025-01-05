@@ -78,55 +78,61 @@ model = GPT2LMHeadModel.from_pretrained(model_name)
 
 def get_top_3_actions(board_state, player):
     """
-    Get the top 3 recommended actions using GPT-2 model.
+    Get the top 3 recommended actions using GPT-2.
     """
+    # Add padding token if not present
+    if tokenizer.pad_token is None:
+        tokenizer.add_special_tokens({'pad_token': tokenizer.eos_token})
+        model.resize_token_embeddings(len(tokenizer))  # Resize to reflect the new token
+
     formatted_board = format_board_state(board_state)
     prompt = f"""
-    based on current checkers board state:{formatted_board}Return a Python only a list of the top 3 recommended moves for player {player}, formatted like this:
+    You are an expert checkers assistant. Here is the board state (10x10):
+    {formatted_board}
+    Return a Python list of the top 3 recommended moves for player {player}, formatted like this:
     [
         ((4, 5), (3, 6)),
         ((6, 1), (7, 0)),
         ((5, 2), (3, 4))
     ]
-    no extra text.
+    Only return the list—no extra text.
     """
 
-
-    # Encode the input and pass through GPT-2
+    # Encode the prompt
     inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=512, padding="max_length")
-    outputs = model.generate(
-        inputs["input_ids"],
-        attention_mask=inputs["attention_mask"],
-        max_new_tokens=100,
-        temperature=0.7,
-        top_p=0.9,
-        do_sample=True,
-        pad_token_id=tokenizer.pad_token_id
-    )
 
+    # Generate output
+    with torch.no_grad():
+        outputs = model.generate(
+            inputs["input_ids"],
+            attention_mask=inputs["attention_mask"],
+            max_new_tokens=100,
+            temperature=0.7,
+            top_p=0.9,
+            do_sample=True,
+            pad_token_id=tokenizer.pad_token_id  # Use the pad_token added earlier
+        )
 
-
-    # Decode the output text
+    # Decode the output
     generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
     print(f"Generated text from GPT-2: {generated_text}")
 
-    # Extract actions
+    # Extract and parse actions
     start_idx = generated_text.find("[")
     end_idx = generated_text.find("]")
     if start_idx == -1 or end_idx == -1:
-        print("Warning: Could not extract valid actions from output. Returning random default actions.")
-        return [random.choice([((4, 5), (3, 6)), ((6, 1), (7, 0)), ((4, 5), (3, 6))])]
+        print("Warning: Could not extract valid actions. Returning random actions.")
+        return [random.choice([((4, 5), (3, 6)), ((6, 1), (7, 0)), ((5, 2), (3, 4))])]
 
     action_str = generated_text[start_idx:end_idx + 1]
     try:
         actions = eval(action_str)
-        if not isinstance(actions, list) or len(actions) < 3:
-            raise ValueError("Invalid format")
     except Exception as e:
         print(f"Error parsing actions: {e}")
-        actions = [random.choice([((4, 5), (3, 6)), ((6, 1), (7, 0)), ((4, 5), (3, 6))])]
+        actions = [random.choice([((4, 5), (3, 6)), ((6, 1), (7, 0)), ((5, 2), (3, 4))])]
 
-    return actions[:3]  # Return only the top 3 actions
+    return actions[:3]  # Return the top 3 actions
+
 
 
 def build_model():
