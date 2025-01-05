@@ -57,14 +57,7 @@ import random
 import os
 import matplotlib.pyplot as plt
 import torch
-import random
-from transformers import GPTNeoForCausalLM, AutoTokenizer
-
-
-# Load the GPT-Neo model and tokenizer
-model_name = "EleutherAI/gpt-neo-1.3B"
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-model = GPTNeoForCausalLM.from_pretrained(model_name)
+import openai
 
 
 def format_board_state(board_state):
@@ -75,10 +68,12 @@ def format_board_state(board_state):
     return formatted_board
 
 
-def get_top_3_actions(board_state, player):
+def get_top_3_actions(board_state, player, api_key):
     """
-    Get the top 3 recommended actions using the GPT-Neo model.
+    Get the top 3 recommended actions using the OpenAI GPT model.
     """
+    openai.api_key = api_key
+
     formatted_board = format_board_state(board_state)
     prompt = f"""
     You are an expert checkers assistant. Given the board state below, return only the Python list of the top 3 recommended moves for player {player}.
@@ -93,30 +88,15 @@ def get_top_3_actions(board_state, player):
     The format must be an exact Python list of tuples.
     """
 
-    # Add padding token if not present
-    if tokenizer.pad_token is None:
-        tokenizer.add_special_tokens({'pad_token': tokenizer.eos_token})
-        model.resize_token_embeddings(len(tokenizer))
+    response = openai.Completion.create(
+        engine="text-davinci-003",
+        prompt=prompt,
+        max_tokens=150,
+        temperature=0.7
+    )
 
-    # Encode the prompt with attention mask
-    inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=512, padding="max_length")
-
-    # Generate output with max_new_tokens and an attention mask
-    with torch.no_grad():
-        outputs = model.generate(
-            inputs["input_ids"],
-            attention_mask=inputs["attention_mask"],
-            max_new_tokens=100,
-            temperature=0.7,
-            num_return_sequences=1,
-            do_sample=True,
-            pad_token_id=tokenizer.pad_token_id
-        )
-
-    # Decode the output text
-    generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    generated_text = response.choices[0].text.strip()
     print(f"Generated text from LLM: {generated_text}")
-
 
     # Extract actions from the output text
     start_idx = generated_text.find("[")
@@ -135,8 +115,6 @@ def get_top_3_actions(board_state, player):
     return actions[:3]  # Return only the top 3 actions
 
 
-
-
 def build_model():
     """
     Build a simple Q-learning neural network model.
@@ -150,6 +128,7 @@ def build_model():
 
 
 def train_checkers_model_with_llm(Opponent="itself"):
+    api_key = input("Enter your OpenAI API key: ")
     model = build_model()
 
     winrates = []
@@ -179,7 +158,7 @@ def train_checkers_model_with_llm(Opponent="itself"):
 
                 board_state = game.board
                 # Step 1: Get LLM-suggested actions
-                top_3_actions = get_top_3_actions(board_state.tolist(), player)
+                top_3_actions = get_top_3_actions(board_state.tolist(), player, api_key)
 
                 # Step 2: Evaluate actions using the model
                 q_values = []
