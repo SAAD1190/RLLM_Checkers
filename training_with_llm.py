@@ -70,8 +70,6 @@ def format_board_state(board_state):
 
 import openai
 
-# Set up OpenAI API key
-openai.api_key = "YOUR_OPENAI_API_KEY"
 
 def get_top_3_actions(board_state, player):
     """
@@ -134,7 +132,7 @@ def build_model():
 
 
 def train_checkers_model_with_llm(Opponent="itself"):
-    api_key = input("Enter your OpenAI API key: ")
+    # api_key = input("Enter your OpenAI API key: ")
     model = build_model()
 
     winrates = []
@@ -164,7 +162,7 @@ def train_checkers_model_with_llm(Opponent="itself"):
 
                 board_state = game.board
                 # Step 1: Get LLM-suggested actions
-                top_3_actions = get_top_3_actions(board_state.tolist(), player, api_key)
+                top_3_actions = get_top_3_actions(board_state.tolist(), player)
 
                 # Step 2: Evaluate actions using the model
                 q_values = []
