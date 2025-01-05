@@ -98,26 +98,29 @@ def get_top_3_actions(board_state, player):
     ]
     """
 
-    # Encode the prompt
-    inputs = tokenizer(prompt, return_tensors="pt", max_length=512, truncation=True)
-    
-    # Generate output from the model
+    # Encode the prompt with attention mask
+    inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=512, padding="max_length")
+
+    # Generate output with `max_new_tokens` and an attention mask
     with torch.no_grad():
         outputs = model.generate(
             inputs["input_ids"],
-            max_length=256,
+            attention_mask=inputs["attention_mask"],
+            max_new_tokens=100,  # Limits the number of new tokens in the output
             temperature=0.7,
             num_return_sequences=1,
             do_sample=True,
+            pad_token_id=tokenizer.eos_token_id
         )
 
     # Decode the output text
     generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
-    
+
     # Extract actions from the output text
     start_idx = generated_text.find("[")
     end_idx = generated_text.find("]")
     if start_idx == -1 or end_idx == -1:
+        print("Warning: Could not extract valid actions from output. Returning random default actions.")
         return [random.choice([((4, 5), (3, 6)), ((6, 1), (7, 0)), [(5, 2), (3, 4), (1, 6)]])]
 
     action_str = generated_text[start_idx:end_idx + 1]
@@ -127,7 +130,8 @@ def get_top_3_actions(board_state, player):
         print(f"Error parsing actions: {e}")
         actions = [random.choice([((4, 5), (3, 6)), ((6, 1), (7, 0)), [(5, 2), (3, 4), (1, 6)]])]
     
-    return actions[:3]  # Return only top 3 actions
+    return actions[:3]  # Return only the top 3 actions
+
 
 
 def build_model():
