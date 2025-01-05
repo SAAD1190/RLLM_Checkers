@@ -100,8 +100,13 @@ def get_top_3_actions(board_state, player):
     Only return the list—no extra text.
     """
 
-    # Tokenize prompt
+    # Add a pad_token if it doesn't exist
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+
+    # Then, proceed with tokenizing
     inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=512, padding=True).to(device)
+
 
     # Generate text
     with torch.no_grad():
