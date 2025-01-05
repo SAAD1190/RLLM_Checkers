@@ -81,22 +81,19 @@ def get_top_3_actions(board_state, player):
     """
     formatted_board = format_board_state(board_state)
     prompt = f"""
-    You are a checkers expert. Given the board state below, suggest the top 3 recommended moves for player {player}.
-    
+    You are a checkers expert. Given the board state below, suggest only the top 3 recommended moves for player {player}.
+
     Board state (10x10):
     {formatted_board}
 
-    Action structure:
-    - Pawn move: ((start_x, start_y), (end_x, end_y))
-    - Queen move: [(start_x, start_y), (intermediate_x, intermediate_y), ..., (end_x, end_y)]
-    
-    Return a list of 3 actions in this format:
+    Please return only the moves list in this format:
     [
-      ((4, 5), (3, 6)),
-      ((6, 1), (7, 0)),
-      [(5, 2), (3, 4), (1, 6)]
+    ((4, 5), (3, 6)),
+    ((6, 1), (7, 0)),
+    [(5, 2), (3, 4), (1, 6)]
     ]
-    """
+"""
+
 
     # Add padding token if not present
     if tokenizer.pad_token is None:
