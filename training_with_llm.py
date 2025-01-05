@@ -86,13 +86,14 @@ def get_top_3_actions(board_state, player):
     Board state (10x10):
     {formatted_board}
 
-    Please return only the moves list in this format:
+    Please return only a Python list of the top 3 actions in this exact format:
     [
-    ((4, 5), (3, 6)),
-    ((6, 1), (7, 0)),
-    [(5, 2), (3, 4), (1, 6)]
+        ((start_x, start_y), (end_x, end_y)),
+        ((start_x, start_y), (end_x, end_y)),
+        [(start_x, start_y), (intermediate_x, intermediate_y), (end_x, end_y)]
     ]
-"""
+    Do not add any other explanation or extra text.
+    """
 
 
     # Add padding token if not present
@@ -117,6 +118,8 @@ def get_top_3_actions(board_state, player):
 
     # Decode the output text
     generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    print(f"Generated text from LLM: {generated_text}")
+
 
     # Extract actions from the output text
     start_idx = generated_text.find("[")
