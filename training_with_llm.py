@@ -101,7 +101,6 @@ def get_top_3_actions(board_state, player):
         max_new_tokens=120,
         temperature=0.3,
         do_sample=False,
-        top_p=0.9,
         pad_token_id=tokenizer.eos_token_id,
     )
 
