@@ -98,19 +98,24 @@ def get_top_3_actions(board_state, player):
     ]
     """
 
+    # Add padding token if not present
+    if tokenizer.pad_token is None:
+        tokenizer.add_special_tokens({'pad_token': tokenizer.eos_token})
+        model.resize_token_embeddings(len(tokenizer))
+
     # Encode the prompt with attention mask
     inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=512, padding="max_length")
 
-    # Generate output with `max_new_tokens` and an attention mask
+    # Generate output with max_new_tokens and an attention mask
     with torch.no_grad():
         outputs = model.generate(
             inputs["input_ids"],
             attention_mask=inputs["attention_mask"],
-            max_new_tokens=100,  # Limits the number of new tokens in the output
+            max_new_tokens=100,
             temperature=0.7,
             num_return_sequences=1,
             do_sample=True,
-            pad_token_id=tokenizer.eos_token_id
+            pad_token_id=tokenizer.pad_token_id
         )
 
     # Decode the output text
@@ -131,6 +136,7 @@ def get_top_3_actions(board_state, player):
         actions = [random.choice([((4, 5), (3, 6)), ((6, 1), (7, 0)), [(5, 2), (3, 4), (1, 6)]])]
     
     return actions[:3]  # Return only the top 3 actions
+
 
 
 
