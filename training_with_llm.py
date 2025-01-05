@@ -115,6 +115,9 @@ def get_top_3_actions(board_state, player):
         )
 
     generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    # Debugging display
+    print(generated_text)
+
 
     # Extract list from generated text
     try:
