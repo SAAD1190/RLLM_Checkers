@@ -1,215 +1,275 @@
+# State structure
+"""
+The state is represented by a 10x10 board (self.board), which is implemented as a NumPy array.
+0: Empty cell // 1: White pawn // 2: White queen // -1: Black pawn // -2: Black queen //
+"""
+# Action structure
+"""
+Pawn moves:
+((start_x, start_y), (end_x, end_y))
+((4, 5), (3, 6))  # A move from (4, 5) to (3, 6)
+
+Queen moves:
+[(start_x, start_y), (intermediate_x, intermediate_y), ..., (end_x, end_y)]
+[(5, 2), (3, 4), (1, 6)]  # A queen moves from (5, 2) to (3, 4) and then to (1, 6)
+"""
+
+# Reward structure
+"""
+Positive reward (+100): When a player wins (all opponent pieces are removed).
+Negative reward (-100): When a player loses.
+Intermediate rewards:
+Capturing pieces increases the player’s score.
+Losing pieces decreases the player’s score.
+"""
+
+# Features structure
+"""
+Used to evaluate board states and train a reinforcement learning (RL) agent.
+The GetFeatures() function extracts features from the current board to inform decisions:
+
+Feature vector (features[]):
+Whether the player has won.
+Number of player’s pawns and queens.
+Number of opponent’s pawns and queens.
+Pieces positioned in strategic areas (e.g., far rows, middle rows).
+"""
+############################################################################################
+# Train the agent using the LLM to limit action space and optimize training process
+
+
+# Step 1: Initilize the LLM
+# Step 2: Get board state and features at each time step
+# Step 3: Prompt the LLM to get the 3 best action with respect to action structure, output is a list of 3 actions (action space of three actions)
+# Step 4: Input the 3 actions to the agent training process. The agent will select the best action from the 3 actions. training is done using the Q-learning algorithm
+
+############################################################################################
+
+
+
 import checkers
-import matplotlib.pyplot as plt
+import openai
+import numpy as np
+import tensorflow as tf
 from keras import Sequential, regularizers
 from keras.layers import Dense
-import tensorflow as tf
-import numpy as np
-import random
 from tqdm import tqdm
+import random
 import os
-from transformers import GPTNeoForCausalLM, GPT2Tokenizer
+import matplotlib.pyplot as plt
 
-# Initialize LLM (GPT-Neo 2.7B)
-model_name = "EleutherAI/gpt-neo-2.7B"
-llm_model = GPTNeoForCausalLM.from_pretrained(model_name, torch_dtype=torch.float16).cuda()  # Enable GPU & FP16 for memory efficiency
-tokenizer = GPT2Tokenizer.from_pretrained(model_name)
+from transformers import GPT2Tokenizer, GPT2LMHeadModel
+import torch
+import random
 
-# Keras model for board evaluation
-def create_keras_model():
+
+from transformers import GPTNeoForCausalLM, AutoTokenizer
+import torch
+import random
+
+
+# Load the GPT-Neo model and tokenizer
+model_name = "EleutherAI/gpt-neo-1.3B"
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+model = GPTNeoForCausalLM.from_pretrained(model_name)
+
+
+def format_board_state(board_state):
+    """
+    Convert the board state into a human-readable string for the LLM prompt.
+    """
+    formatted_board = "\n".join([" ".join([f"{int(cell):2}" for cell in row]) for row in board_state])
+    return formatted_board
+
+
+def get_top_3_actions(board_state, player):
+    """
+    Get the top 3 recommended actions using the GPT-Neo model.
+    """
+    formatted_board = format_board_state(board_state)
+    prompt = f"""
+    You are a checkers expert. Given the board state below, suggest the top 3 recommended moves for player {player}.
+    
+    Board state (10x10):
+    {formatted_board}
+
+    Action structure:
+    - Pawn move: ((start_x, start_y), (end_x, end_y))
+    - Queen move: [(start_x, start_y), (intermediate_x, intermediate_y), ..., (end_x, end_y)]
+    
+    Return a list of 3 actions in this format:
+    [
+      ((4, 5), (3, 6)),
+      ((6, 1), (7, 0)),
+      [(5, 2), (3, 4), (1, 6)]
+    ]
+    """
+
+    # Encode the prompt
+    inputs = tokenizer(prompt, return_tensors="pt", max_length=512, truncation=True)
+    
+    # Generate output from the model
+    with torch.no_grad():
+        outputs = model.generate(
+            inputs["input_ids"],
+            max_length=256,
+            temperature=0.7,
+            num_return_sequences=1,
+            do_sample=True,
+        )
+
+    # Decode the output text
+    generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    
+    # Extract actions from the output text
+    start_idx = generated_text.find("[")
+    end_idx = generated_text.find("]")
+    if start_idx == -1 or end_idx == -1:
+        return [random.choice([((4, 5), (3, 6)), ((6, 1), (7, 0)), [(5, 2), (3, 4), (1, 6)]])]
+
+    action_str = generated_text[start_idx:end_idx + 1]
+    try:
+        actions = eval(action_str)
+    except Exception as e:
+        print(f"Error parsing actions: {e}")
+        actions = [random.choice([((4, 5), (3, 6)), ((6, 1), (7, 0)), [(5, 2), (3, 4), (1, 6)]])]
+    
+    return actions[:3]  # Return only top 3 actions
+
+
+def build_model():
+    """
+    Build a simple Q-learning neural network model.
+    """
     model = Sequential()
-    model.add(Dense(32, activation='relu', input_dim=5))
-    model.add(Dense(16, activation='relu', kernel_regularizer=regularizers.l2(0.1)))
-    model.add(Dense(1, activation='linear', kernel_regularizer=regularizers.l2(0.1)))
-    model.compile(optimizer='nadam', loss='mean_squared_error', metrics=["mae"])
+    model.add(Dense(32, activation='relu', input_dim=5))  # 5 features
+    model.add(Dense(16, activation='relu', kernel_regularizer=regularizers.l2(0.01)))
+    model.add(Dense(1, activation='linear'))  # Q-value output
+    model.compile(optimizer='adam', loss='mse')
     return model
 
-def board_to_string(board):
-    """
-    Convert the checkers board into a formatted string.
-    """
-    board_str = "\n".join([" ".join([str(int(cell)) for cell in row]) for row in board])
-    return board_str
 
-def get_top_moves_from_llm(board, player, num_moves=3):
-    """
-    Get the top N moves from LLM based on the current board state.
-    """
-    player_name = "white" if player == 1 else "black"
-    
-    # Convert board state to string
-    formatted_board = board_to_string(board)
-    
-    # Add example moves to the prompt
-    example_moves = """
-    Examples of valid moves:
-    - (2, 3) -> (4, 5)
-    - (6, 7) -> (5, 6)
-    - (1, 2) -> (3, 4)
-    """
-    
-    # Create the prompt
-    prompt = f"""
-    Current board state:
-    {formatted_board}
-    Player: {player_name}
-    Suggest the top {num_moves} best moves for {player_name} in the format (x1, y1) -> (x2, y2).
-    {example_moves}
-    """
-    
-    print(f"LLM Prompt: {prompt[:300]}...")  # For debugging
-    
-    try:
-        inputs = tokenizer(prompt, return_tensors="pt")
-        inputs = {k: v.cuda() for k, v in inputs.items()}  # Ensure inputs are on GPU
-        outputs = llm_model.generate(
-            **inputs,
-            max_new_tokens=50,
-            temperature=0.7,
-            top_k=50,
-            pad_token_id=tokenizer.eos_token_id,
-        )
-        prediction = tokenizer.decode(outputs[0], skip_special_tokens=True)
-        print(f"LLM Output: {prediction}")
-    except Exception as e:
-        print(f"Error in LLM generation: {e}")
-        return []  # Return empty moves if generation fails
+def train_checkers_model_with_llm(Opponent="itself"):
+    model = build_model()
 
-    # Extract moves from the LLM output
-    lines = prediction.split("\n")
-    parsed_moves = []
-    for line in lines:
-        if "->" in line:
-            move = parse_llm_move(line)
-            if move:
-                parsed_moves.append(move)
-        if len(parsed_moves) >= num_moves:
-            break
-
-    return parsed_moves
-
-def parse_llm_move(move_str):
-    """
-    Parse the LLM output string into a list of tuples (move format for checkers).
-    Example input: '(2, 3) -> (4, 5)'
-    Example output: [(2, 3), (4, 5)]
-    """
-    try:
-        moves = move_str.replace("->", ",").replace("(", "").replace(")", "").split(",")
-        coords = [(int(moves[i].strip()), int(moves[i + 1].strip())) for i in range(0, len(moves), 2)]
-        return coords
-    except Exception as e:
-        print(f"Failed to parse LLM move: {move_str}, error: {e}")
-        return None
-
-
-def train_checkers_model(Opponent="itself"):
-    model = create_keras_model()
-    winrates, avg_losses, avg_rewards = [], [], []
+    winrates = []
+    avg_losses = []
+    avg_rewards = []
+    learning_rate = 0.5
+    discount_factor = 0.95
+    exploration = 0.9  # Decreases over time for exploitation
     win, lose, draw = 0, 0, 0
 
-    for generations in tqdm(range(5)):
-        data, labels = [], []
-        generation_losses, generation_rewards = [], []
+    for generation in tqdm(range(5)):
+        data = []
+        labels = []
+        total_reward = 0
+        total_loss = 0
+        num_moves = 0
 
-        for g in range(10):
-            temp_data = []
+        for _ in range(10):  # Number of games per generation
             game = checkers.Checkers()
-            player = 1  # Start with player 1 (white)
+            player = 1
             count = 0
-
             while True:
                 count += 1
-                if count > 1000:
+                if count > 1000:  # Draw condition
                     draw += 1
                     break
 
-                # Get the board for the current player
-                board = game.board
-                print(f"Board for player {player}: \n{board}")
+                board_state = game.board
+                # Step 1: Get LLM-suggested actions
+                top_3_actions = get_top_3_actions(board_state.tolist(), player)
 
-                # Get the top 3 moves from the LLM
-                candidate_moves = get_top_moves_from_llm(board, player, num_moves=3)
+                # Step 2: Evaluate actions using the model
+                q_values = []
+                for action in top_3_actions:
+                    features = game.GetFeatures(player)
+                    input_features = tf.constant(features[:5], shape=(1, 5), dtype=tf.float32)
+                    q_value = model.predict(input_features, verbose=0)
+                    q_values.append(q_value[0][0])
 
-                if len(candidate_moves) == 0:
+                # Step 3: Choose best action or explore
+                if random.random() < exploration:
+                    chosen_action = random.choice(top_3_actions)  # Exploration
+                else:
+                    chosen_action = top_3_actions[np.argmax(q_values)]  # Exploitation
+
+                # Step 4: Apply the chosen action
+                game.PushMove(chosen_action)
+
+                # Calculate reward
+                end_game = game.EndGame()
+                if end_game == 1:
+                    reward = 100  # Player 1 wins
+                    win += 1
+                elif end_game == -1:
+                    reward = -100  # Player 1 loses
                     lose += 1
+                else:
+                    reward = 0
+
+                # Record data for training
+                features = game.GetFeatures(player)
+                q_update = reward + discount_factor * np.max(q_values)
+                data.append(features[:5])
+                labels.append(q_update)
+
+                total_reward += reward
+                num_moves += 1
+
+                if end_game != 0:
                     break
 
-                # Get model scores for the 3 moves
-                scores = []
-                for move in candidate_moves:
-                    compressed_move = game.CompressBoard(player, game.board)
-                    tensor_move = tf.constant(compressed_move.flatten(), dtype=tf.float32)
-                    score = model.predict_on_batch(tf.reshape(tensor_move, (1, 5)))
-                    scores.append(score)
+                # Switch to the other player
+                player *= -1
 
-                # Choose the best move based on scores
-                best_index = np.argmax(scores)
-                best_move = candidate_moves[best_index]
+        # Train the model
+        data = np.array(data)
+        labels = np.array(labels)
+        history = model.fit(data, labels, epochs=16, batch_size=32, verbose=0)
+        avg_loss = np.mean(history.history['loss'])
+        avg_losses.append(avg_loss)
+        avg_rewards.append(total_reward / num_moves if num_moves else 0)
 
-                # Apply the best move
-                game.PushMove(best_move)
-                temp_data.append(compressed_move)
+        # Update exploration rate
+        exploration *= 0.95
 
-                # Check if the game has ended
-                end = game.EndGame()
-                if end in [1, -1]:
-                    reward = 10 if end == 1 else -10
-                    win += (end == 1)
-                    lose += (end == -1)
-                    generation_rewards.append(reward)
-
-                    temp_tensor = tf.constant(temp_data[1:], dtype=tf.float32)
-                    old_prediction = model.predict_on_batch(temp_tensor)
-                    optimal_future_value = np.ones_like(old_prediction) * (1 if end == 1 else -1)
-                    temp_labels = old_prediction + 0.5 * (reward + 0.95 * optimal_future_value - old_prediction)
-                    data.extend(temp_data[1:])
-                    labels.extend(temp_labels)
-                    break
-
-                player = -player  # Switch player after each turn
-
-        if data:
-            data_tensor = tf.constant(np.array(data), dtype=tf.float32)
-            labels_tensor = tf.constant(np.array(labels), dtype=tf.float32)
-
-            # Train Keras model
-            history = model.fit(data_tensor, labels_tensor, epochs=16, batch_size=256, verbose=0)
-            avg_losses.append(np.mean(history.history['loss']))
-            avg_rewards.append(np.mean(generation_rewards))
-
-        winrate = int(win / (win + draw + lose + 1e-5) * 100)
+        winrate = int((win) / (win + draw + lose) * 100) if (win + draw + lose) else 0
         winrates.append(winrate)
 
         # Save model
         model_dir = "models"
         os.makedirs(model_dir, exist_ok=True)
-        keras_path = os.path.join(model_dir, f"{Opponent}.keras")
+        keras_path = os.path.join(model_dir, f"{Opponent}_llm.keras")
         model.save(keras_path)
 
-    # Plot results
+    # Plot Win Rate
     plt.figure(figsize=(10, 5))
-    plt.plot(range(len(winrates)), winrates, marker='o', label='Win Rate')
+    plt.plot(range(len(winrates)), winrates, marker='o', label="Win Rate")
     plt.title('Win Rate per Generation')
     plt.xlabel('Generations')
-    plt.ylabel('Win Rate [%]')
+    plt.ylabel('Win Rate (%)')
     plt.legend()
-    plt.show()
 
+    # Plot Average Loss per Generation
     plt.figure(figsize=(10, 5))
-    plt.plot(range(len(avg_losses)), avg_losses, marker='o', color='red', label='Average Loss')
+    plt.plot(range(len(avg_losses)), avg_losses, marker='o', color='red', label="Average Loss")
     plt.title('Average Loss per Generation')
     plt.xlabel('Generations')
     plt.ylabel('Loss')
     plt.legend()
-    plt.show()
 
+    # Plot Average Reward per Generation
     plt.figure(figsize=(10, 5))
-    plt.plot(range(len(avg_rewards)), avg_rewards, marker='o', color='green', label='Average Reward')
+    plt.plot(range(len(avg_rewards)), avg_rewards, marker='o', color='green', label="Average Reward")
     plt.title('Average Reward per Generation')
     plt.xlabel('Generations')
     plt.ylabel('Reward')
     plt.legend()
+
     plt.show()
 
-if "__main__" == __name__:
-    train_checkers_model()
+
+if __name__ == "__main__":
+    train_checkers_model_with_llm()
