@@ -62,22 +62,16 @@ from transformers import GPT2LMHeadModel, GPT2Tokenizer
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 
-import torch
-import random
-from transformers import AutoTokenizer, AutoModelForCausalLM
-
-# Load Mistral-7B
-model_name = "mistralai/Mistral-7B"
+# Load LLaMA 2 13B model
+model_name = "meta-llama/Llama-2-13b-chat-hf"
 tokenizer = AutoTokenizer.from_pretrained(model_name)
-model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.float16)
-
-# Ensure pad_token is set
-if tokenizer.pad_token is None:
-    tokenizer.pad_token = tokenizer.eos_token
+model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype="auto")
 
 # Move the model to GPU if available
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model = model.to(device)
+
+
 
 def format_board_state(board_state):
     """
@@ -88,7 +82,7 @@ def format_board_state(board_state):
 
 def get_top_3_actions(board_state, player):
     """
-    Get the top 3 recommended actions using Mistral-7B.
+    Get the top 3 recommended actions using LLaMA 2 13B.
     """
     formatted_board = format_board_state(board_state)
     prompt = f"""
@@ -104,7 +98,7 @@ def get_top_3_actions(board_state, player):
     """
 
     # Tokenize prompt
-    inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=512, padding="max_length").to(device)
+    inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=512, padding=True).to(device)
 
     # Generate text
     with torch.no_grad():
@@ -113,8 +107,7 @@ def get_top_3_actions(board_state, player):
             max_new_tokens=200,
             temperature=0.5,
             top_p=0.9,
-            do_sample=True,
-            pad_token_id=tokenizer.pad_token_id  # Ensure padding is properly handled
+            do_sample=True
         )
 
     # Decode output
@@ -125,18 +118,15 @@ def get_top_3_actions(board_state, player):
     start_idx = generated_text.find("[")
     end_idx = generated_text.find("]")
     if start_idx == -1 or end_idx == -1:
-        print("Warning: Could not extract valid moves, returning random default moves.")
         return [random.choice([((4, 5), (3, 6)), ((6, 1), (7, 0)), ((5, 2), (3, 4))])]
 
     action_str = generated_text[start_idx:end_idx + 1]
     try:
         actions = eval(action_str)
-    except Exception as e:
-        print(f"Error parsing actions: {e}")
+    except:
         return [random.choice([((4, 5), (3, 6)), ((6, 1), (7, 0)), ((5, 2), (3, 4))])]
 
-    return actions[:3]  # Return the top 3 actions
-
+    return actions[:3]
 
 
 
