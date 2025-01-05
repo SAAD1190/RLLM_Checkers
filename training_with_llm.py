@@ -75,6 +75,7 @@ def get_top_3_actions(board_state, player, api_key):
     """
     Get the top 3 recommended actions using OpenAI GPT.
     """
+    openai.api_key = api_key
 
     formatted_board = format_board_state(board_state)
     prompt = f"""
@@ -90,19 +91,20 @@ def get_top_3_actions(board_state, player, api_key):
     The format must be an exact Python list of tuples.
     """
 
-    # Call OpenAI API
-    response = openai.ChatCompletion.chat(
+    # Make the API call using the correct method
+    response = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.3,
-        max_tokens=200
+        messages=[{"role": "system", "content": "You are an expert in checkers strategy."},
+                  {"role": "user", "content": prompt}],
+        max_tokens=200,
+        temperature=0.7
     )
 
-    # Extract generated text
+    # Extract the assistant's response
     generated_text = response['choices'][0]['message']['content']
-    print(f"Generated text from OpenAI GPT: {generated_text}")
+    print(f"Generated text from LLM: {generated_text}")
 
-    # Extract the list of actions
+    # Extract and parse the actions
     start_idx = generated_text.find("[")
     end_idx = generated_text.find("]")
     if start_idx == -1 or end_idx == -1:
@@ -115,8 +117,9 @@ def get_top_3_actions(board_state, player, api_key):
     except Exception as e:
         print(f"Error parsing actions: {e}")
         actions = [random.choice([((4, 5), (3, 6)), ((6, 1), (7, 0)), [(5, 2), (3, 4), (1, 6)]])]
-    
+
     return actions[:3]  # Return only the top 3 actions
+
 
 
 
