@@ -68,9 +68,14 @@ def format_board_state(board_state):
     return formatted_board
 
 
-def get_top_3_actions(board_state, player, api_key):
+import openai
+
+# Set up OpenAI API key
+openai.api_key = "YOUR_OPENAI_API_KEY"
+
+def get_top_3_actions(board_state, player):
     """
-    Get the top 3 recommended actions using the OpenAI API (GPT).
+    Get the top 3 recommended actions using OpenAI GPT (new API interface).
     """
     formatted_board = format_board_state(board_state)
     prompt = f"""
@@ -83,39 +88,36 @@ def get_top_3_actions(board_state, player, api_key):
         ((start_x, start_y), (end_x, end_y)),
         ((start_x, start_y), (end_x, end_y))
     ]
-    The format must be an exact Python list of tuples.
     """
+    
+    # Call OpenAI API using the new interface
+    response = openai.ChatCompletion.chat(
+        model="gpt-3.5-turbo",  # Or "gpt-4"
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.3,  # Low temperature for deterministic output
+        max_tokens=200
+    )
 
-    openai.api_key = api_key  # Set your API key
+    # Extract generated text
+    generated_text = response['choices'][0]['message']['content']
+    print(f"Generated text from OpenAI GPT: {generated_text}")
 
+    # Extract the list of actions
+    start_idx = generated_text.find("[")
+    end_idx = generated_text.find("]")
+    if start_idx == -1 or end_idx == -1:
+        print("Warning: Could not extract valid actions from output. Returning random default actions.")
+        return [random.choice([((4, 5), (3, 6)), ((6, 1), (7, 0)), [(5, 2), (3, 4), (1, 6)]])]
+
+    action_str = generated_text[start_idx:end_idx + 1]
     try:
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",  # You can change to "gpt-4" if available
-            messages=[{"role": "system", "content": "You are an expert checkers assistant."},
-                      {"role": "user", "content": prompt}],
-            temperature=0.7,
-            max_tokens=500  # Set the token limit for the response
-        )
-
-        # Extract the generated text
-        generated_text = response['choices'][0]['message']['content'].strip()
-        print(f"Generated text from LLM: {generated_text}")
-
-        # Extract actions from the output text
-        start_idx = generated_text.find("[")
-        end_idx = generated_text.find("]")
-        if start_idx == -1 or end_idx == -1:
-            print("Warning: Could not extract valid actions from output. Returning random default actions.")
-            return [random.choice([((4, 5), (3, 6)), ((6, 1), (7, 0)), [(5, 2), (3, 4), (1, 6)]])]
-
-        action_str = generated_text[start_idx:end_idx + 1]
         actions = eval(action_str)
-
     except Exception as e:
-        print(f"Error during API call: {e}")
+        print(f"Error parsing actions: {e}")
         actions = [random.choice([((4, 5), (3, 6)), ((6, 1), (7, 0)), [(5, 2), (3, 4), (1, 6)]])]
-
+    
     return actions[:3]  # Return only the top 3 actions
+
 
 
 
