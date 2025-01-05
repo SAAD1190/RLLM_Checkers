@@ -84,58 +84,49 @@ def format_board_state(board_state):
     return formatted_board
 
 def get_top_3_actions(board_state, player):
-    """
-    Get the top 3 recommended actions using the LLaMA-2 7B chat model.
-    """
     formatted_board = format_board_state(board_state)
     prompt = f"""
-    You are an expert checkers assistant. Here is the board state (10x10):
+    Here is the current 10x10 checkers board:
     {formatted_board}
-    Return a Python list of the top 3 recommended moves for player {player}, formatted like this:
+    Return the top 3 recommended moves for player {player} as a Python list in the format:
     [
-        ((4, 5), (3, 6)),
-        ((6, 1), (7, 0)),
-        ((5, 2), (3, 4))
+        ((start_x, start_y), (end_x, end_y)),
+        ((start_x, start_y), (end_x, end_y)),
+        ((start_x, start_y), (end_x, end_y))
     ]
-    Only return the list—no extra text.
+    Only return the list. No explanations.
     """
 
-    # Add a pad_token if it doesn't exist
+    # Add padding token if missing
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
-    # Then, proceed with tokenizing
     inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=512, padding=True).to(device)
 
-
-    # Generate text
+    # Generate response
     with torch.no_grad():
         outputs = model.generate(
             inputs["input_ids"],
-            max_new_tokens=200,
-            temperature=0.5,
-            top_p=0.9,
-            do_sample=True
+            max_new_tokens=150,
+            temperature=0.2,
+            top_p=0.7,
+            repetition_penalty=1.2,
+            do_sample=False
         )
 
-    # Decode output
     generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
-    print(f"Generated moves: {generated_text}")
 
     # Extract list from generated text
-    start_idx = generated_text.find("[")
-    end_idx = generated_text.find("]")
-    if start_idx == -1 or end_idx == -1:
-        return [random.choice([((4, 5), (3, 6)), ((6, 1), (7, 0)), ((5, 2), (3, 4))])]
-
-    action_str = generated_text[start_idx:end_idx + 1]
     try:
+        start_idx = generated_text.index("[")
+        end_idx = generated_text.index("]") + 1
+        action_str = generated_text[start_idx:end_idx]
         actions = eval(action_str)
     except Exception as e:
         print(f"Error parsing actions: {e}")
-        return [random.choice([((4, 5), (3, 6)), ((6, 1), (7, 0)), ((5, 2), (3, 4))])]
+        actions = [((4, 5), (3, 6)), ((6, 1), (7, 0)), ((5, 2), (3, 4))]
 
-    return actions[:3]  # Return the top 3 actions
+    return actions[:3]  # Ensure only 3 actions are returned
 
 
 
