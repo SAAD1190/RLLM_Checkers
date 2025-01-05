@@ -70,10 +70,8 @@ def format_board_state(board_state):
 
 def get_top_3_actions(board_state, player, api_key):
     """
-    Get the top 3 recommended actions using the OpenAI GPT model.
+    Get the top 3 recommended actions using the OpenAI API (GPT).
     """
-    openai.api_key = api_key
-
     formatted_board = format_board_state(board_state)
     prompt = f"""
     You are an expert checkers assistant. Given the board state below, return only the Python list of the top 3 recommended moves for player {player}.
@@ -88,31 +86,37 @@ def get_top_3_actions(board_state, player, api_key):
     The format must be an exact Python list of tuples.
     """
 
-    response = openai.Completion.create(
-        engine="text-davinci-003",
-        prompt=prompt,
-        max_tokens=150,
-        temperature=0.7
-    )
+    openai.api_key = api_key  # Set your API key
 
-    generated_text = response.choices[0].text.strip()
-    print(f"Generated text from LLM: {generated_text}")
-
-    # Extract actions from the output text
-    start_idx = generated_text.find("[")
-    end_idx = generated_text.find("]")
-    if start_idx == -1 or end_idx == -1:
-        print("Warning: Could not extract valid actions from output. Returning random default actions.")
-        return [random.choice([((4, 5), (3, 6)), ((6, 1), (7, 0)), [(5, 2), (3, 4), (1, 6)]])]
-
-    action_str = generated_text[start_idx:end_idx + 1]
     try:
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",  # You can change to "gpt-4" if available
+            messages=[{"role": "system", "content": "You are an expert checkers assistant."},
+                      {"role": "user", "content": prompt}],
+            temperature=0.7,
+            max_tokens=500  # Set the token limit for the response
+        )
+
+        # Extract the generated text
+        generated_text = response['choices'][0]['message']['content'].strip()
+        print(f"Generated text from LLM: {generated_text}")
+
+        # Extract actions from the output text
+        start_idx = generated_text.find("[")
+        end_idx = generated_text.find("]")
+        if start_idx == -1 or end_idx == -1:
+            print("Warning: Could not extract valid actions from output. Returning random default actions.")
+            return [random.choice([((4, 5), (3, 6)), ((6, 1), (7, 0)), [(5, 2), (3, 4), (1, 6)]])]
+
+        action_str = generated_text[start_idx:end_idx + 1]
         actions = eval(action_str)
+
     except Exception as e:
-        print(f"Error parsing actions: {e}")
+        print(f"Error during API call: {e}")
         actions = [random.choice([((4, 5), (3, 6)), ((6, 1), (7, 0)), [(5, 2), (3, 4), (1, 6)]])]
-    
+
     return actions[:3]  # Return only the top 3 actions
+
 
 
 def build_model():
