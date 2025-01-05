@@ -81,20 +81,17 @@ def get_top_3_actions(board_state, player):
     """
     formatted_board = format_board_state(board_state)
     prompt = f"""
-    You are a checkers expert. Given the board state below, suggest only the top 3 recommended moves for player {player}.
-
+    You are an expert checkers assistant. Given the board state below, return only the Python list of the top 3 recommended moves for player {player}.
     Board state (10x10):
     {formatted_board}
-
-    Please return only a Python list of the top 3 actions in this exact format:
+    Do not add any explanations, links, or extra text. Return only the list of moves in this format:
     [
         ((start_x, start_y), (end_x, end_y)),
         ((start_x, start_y), (end_x, end_y)),
-        [(start_x, start_y), (intermediate_x, intermediate_y), (end_x, end_y)]
+        ((start_x, start_y), (end_x, end_y))
     ]
-    Do not add any other explanation or extra text.
+    The format must be an exact Python list of tuples.
     """
-
 
     # Add padding token if not present
     if tokenizer.pad_token is None:
