@@ -23,12 +23,13 @@ This project leverages reinforcement learning and a Language Model (LLM) to trai
   - Train and play against random, minimax, or AI-based strategies.
 
 ## Game Against Trained AI Agent
----------------------------
+
 You can play a game against the trained AI agent by running the interactive gameplay script:
 
 ```bash
 python play_human.py
 ```
+Note: The agent will use the saved .keras model obtained after training.
 
 ## Explore Further
 
