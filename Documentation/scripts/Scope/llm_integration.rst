@@ -72,12 +72,5 @@ The integration of the LLM into the reinforcement learning (RL) pipeline involve
 
 - **Limitations**:
     - Occasional invalid outputs (mitigated by retry mechanism).
+    - Need for dynamic parsing of LLM responses.
     - Higher latency due to LLM inference time.
-
-
-**Conclusion and Future Work**
----------------------------------
-The integration of the LLM with the RL agent demonstrated that narrowing the action space using top recommendations can enhance the training process. Future improvements include:
-- Fine-tuning the LLM for faster inference.
-- Expanding the system to evaluate multi-move strategies.
-- Optimizing the Q-learning model with additional features for complex board states.
