@@ -22,10 +22,16 @@ This project leverages reinforcement learning and a Language Model (LLM) to trai
 - **Customizable Opponents:**
   - Train and play against random, minimax, or AI-based strategies.
 
+## Game Against Trained AI Agent
+---------------------------
+You can play a game against the trained AI agent by running the interactive gameplay script:
+
+```bash
+python play_human.py
+```
+
 ## Explore Further
 
 For detailed documentation, including implementation details, interactive interface usage, and advanced features, visit the [Documentation](https://rllm-checkers.readthedocs.io/).
 
 ---
-
-Feel free to contribute or raise issues to enhance this project further!

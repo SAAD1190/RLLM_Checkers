@@ -40,6 +40,12 @@ Key Features
 
 .. toctree::
    :maxdepth: 2
+   :caption: LLM Integration
+
+   Documentation/scripts/Scope/llm_integration.rst
+
+.. toctree::
+   :maxdepth: 2
    :caption: Interface
 
    Documentation/scripts/Scope/interface.rst
