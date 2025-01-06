@@ -46,7 +46,6 @@ Pieces positioned in strategic areas (e.g., far rows, middle rows).
 ############################################################################################
 
 
-
 import checkers
 import numpy as np
 import tensorflow as tf
@@ -57,24 +56,10 @@ import random
 import os
 import matplotlib.pyplot as plt
 import torch
-from transformers import GPT2LMHeadModel, GPT2Tokenizer
+from LLM import Run_LLM
 
-from transformers import AutoTokenizer, AutoModelForCausalLM
-import torch
 
-import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM
 
-# Model name
-model_name = "mistralai/Mistral-7B-v0.1"
-
-# Load the tokenizer and model
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype="auto")
-
-# Move the model to GPU if available
-device = "cuda" if torch.cuda.is_available() else "cpu"
-model = model.to(device)
 
 def format_board_state(board_state):
     """
@@ -85,53 +70,9 @@ def format_board_state(board_state):
 
 def get_top_3_actions(board_state, player):
     formatted_board = format_board_state(board_state)
-    prompt = f"""
-    Here is the current 10x10 checkers board:
-    {formatted_board}
-
-    Player {player}'s turn. Return the top 3 recommended moves as a Python list in this exact format:
-    [
-        ((start_x, start_y), (end_x, end_y)),
-        ((start_x, start_y), (end_x, end_y)),
-        ((start_x, start_y), (end_x, end_y))
-    ]
-    No text or explanations—only the list.
-    """
-
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
-
-    inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=512, padding=True).to(device)
-    attention_mask = inputs["attention_mask"]
-
-    with torch.no_grad():
-        outputs = model.generate(
-            input_ids=inputs["input_ids"],
-            attention_mask=attention_mask,
-            max_new_tokens=100,
-            do_sample=True,
-            temperature=0.5,
-            top_p=0.9,
-            repetition_penalty=1.2,
-        )
-
-    generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
-    print(generated_text)
-
-    # Extract list from generated text
-    try:
-        start_idx = generated_text.index("[")
-        end_idx = generated_text.index("]") + 1
-        action_str = generated_text[start_idx:end_idx]
-        actions = eval(action_str)
-        if not isinstance(actions, list):
-            raise ValueError("Output is not a list.")
-    except Exception as e:
-        print(f"Error parsing actions: {e}")
-        actions = [((4, 5), (3, 6)), ((6, 1), (7, 0)), ((5, 2), (3, 4))]  # Default moves
-
-    return actions[:3]
-
+    Suggestions = Run_LLM(formatted_board,player)
+    #print(Suggestions)
+    return Suggestions
 
 def build_model():
     """
@@ -163,13 +104,15 @@ def train_checkers_model_with_llm(Opponent="itself"):
         total_loss = 0
         num_moves = 0
 
-        for _ in range(10):  # Number of games per generation
+        for _ in range(2):  # Number of games per generation
             game = checkers.Checkers()
             player = 1
             count = 0
             while True:
+                
                 count += 1
-                if count > 1000:  # Draw condition
+                print("Game count: ", count)
+                if count > 2:  # Draw condition
                     draw += 1
                     break
 
@@ -246,6 +189,7 @@ def train_checkers_model_with_llm(Opponent="itself"):
     plt.title('Win Rate per Generation')
     plt.xlabel('Generations')
     plt.ylabel('Win Rate (%)')
+    #plt.savefig("WIN_RATES.png", dpi=300)
     plt.legend()
 
     # Plot Average Loss per Generation
@@ -262,6 +206,7 @@ def train_checkers_model_with_llm(Opponent="itself"):
     plt.title('Average Reward per Generation')
     plt.xlabel('Generations')
     plt.ylabel('Reward')
+    #plt.savefig("AVG_LOSS.png", dpi=300)
     plt.legend()
 
     plt.show()
